@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TOD Online Realtime</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { background: #020617; color: white; font-family: sans-serif; overflow-x: hidden; }
+        .glass { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 28px; }
+        .btn-tap:active { transform: scale(0.95); }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        
+        @keyframes slideIn {
+            from { transform: translateX(-20px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        .animate-item { animation: slideIn 0.3s ease-out forwards; }
+    </style>
+</head>
+<body class="p-6 flex flex-col items-center min-h-screen text-center">
+
+    <!-- Tampilan Masuk Nama -->
+    <div id="view-login" class="w-full max-w-sm mt-20 space-y-8">
+        <div class="space-y-2">
+            <h1 class="text-5xl font-black italic text-indigo-500 tracking-tighter">TOD LIVE</h1>
+            <p class="text-[10px] text-indigo-300/40 font-bold tracking-[0.3em] uppercase">Realtime Database Active</p>
+        </div>
+        <div class="glass p-8 space-y-4 shadow-2xl">
+            <input id="input-nama" type="text" placeholder="Siapa namamu?" class="w-full p-5 rounded-2xl bg-slate-900 border-none outline-none focus:ring-2 ring-indigo-500 text-white text-center font-bold text-lg">
+            <button onclick="gasMain()" class="w-full bg-indigo-600 p-5 rounded-2xl font-black uppercase tracking-widest btn-tap shadow-lg shadow-indigo-600/20">Mulai Bermain</button>
+        </div>
+    </div>
+
+    <!-- Tampilan Area Game -->
+    <div id="view-game" class="hidden w-full max-w-md space-y-6">
+        <div class="glass p-10 shadow-2xl relative overflow-hidden">
+            <div id="disp-tipe" class="text-[10px] font-black text-indigo-400 uppercase tracking-[0.5em] mb-4">Menunggu...</div>
+            <h2 id="disp-isi" class="text-2xl font-bold italic mb-6 leading-tight text-slate-100">"Klik kartu di bawah!"</h2>
+            <p id="disp-pembuat" class="text-[10px] text-white/20 font-bold uppercase"></p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+            <button onclick="pilihTantangan('TRUTH')" class="bg-indigo-600/20 border border-indigo-500/30 p-6 rounded-3xl font-black text-indigo-400 btn-tap uppercase text-xs tracking-widest hover:bg-indigo-600/30 transition-all">TRUTH</button>
+            <button onclick="pilihTantangan('DARE')" class="bg-rose-600/20 border border-rose-500/30 p-6 rounded-3xl font-black text-rose-400 btn-tap uppercase text-xs tracking-widest hover:bg-rose-600/30 transition-all">DARE</button>
+        </div>
+
+        <!-- Log Aktivitas Realtime -->
+        <div class="glass p-6 h-72 flex flex-col text-left">
+            <div class="flex justify-between items-center mb-4 border-b border-white/5 pb-2">
+                <span class="text-[10px] font-black text-white/30 uppercase tracking-widest">Aktivitas Live</span>
+                <div class="flex items-center gap-1.5">
+                    <div class="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
+                    <span class="text-[8px] font-bold text-green-500 uppercase">Terhubung</span>
+                </div>
+            </div>
+            <div id="log-list" class="flex-1 overflow-y-auto space-y-3 no-scrollbar">
+                <!-- Aktivitas muncul otomatis -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // DATA SUPABASE KAMU (Sudah otomatis terisi dari hasil temuanmu!)
+        const URL_PROYEK = 'https://rruxlxoeelxjjmhafkox.supabase.co'; 
+        const KEY_ANON = 'EyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJydXhseG9lZWx4ampqbWhhZmtjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk3NDU5OTMsImV4cCI6MjA4NTMyMTk5M30.oR2hl_BDD1P6Dmtos2So-aJ_eoFl1-Kwybt6mQnvq0Q'; 
+
+        const sbc = supabase.createClient(URL_PROYEK, KEY_ANON);
+        let namaUser = "";
+
+        const DAFTAR_SOAL = {
+            TRUTH: [
+                "Siapa orang yang terakhir kamu chat di WhatsApp?",
+                "Pernah bohong ke orang tua soal apa yang paling parah?",
+                "Siapa orang di ruangan ini yang paling kamu taksir?",
+                "Apa hal paling memalukan yang pernah kamu alami?",
+                "Kapan terakhir kali kamu nangis dan kenapa?",
+                "Apa rahasia yang gak pernah kamu ceritain ke siapapun?"
+            ],
+            DARE: [
+                "Telepon satu nomor acak dan teriak 'Aku Bau'!",
+                "Tirukan suara hewan selama 1 menit penuh!",
+                "Posting foto aib kamu di Story WA sekarang juga!",
+                "Biarkan temanmu membuat satu chat ke crush kamu!",
+                "Dance tanpa musik di depan kamera selama 30 detik!",
+                "Minum campuran air putih dan kecap/saus satu sendok!"
+            ]
+        };
+
+        async function gasMain() {
+            namaUser = document.getElementById('input-nama').value.trim();
+            if(!namaUser) return alert("Eits, isi nama kamu dulu ya!");
+
+            document.getElementById('view-login').classList.add('hidden');
+            document.getElementById('view-game').classList.remove('hidden');
+
+            // 1. AKTIFKAN REALTIME (Sangat Penting!)
+            sbc.channel('room-utama')
+                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'Tantangan' }, p => {
+                    updateLayar(p.new);
+                })
+                .subscribe();
+            
+            // 2. Ambil data terakhir agar tidak kosong saat baru masuk
+            ambilDataAwal();
+        }
+
+        async function pilihTantangan(tipe) {
+            const list = DAFTAR_SOAL[tipe];
+            const teks = list[Math.floor(Math.random() * list.length)];
+            
+            // Masukkan data ke database Supabase kamu (Tabel: Tantangan)
+            const { error } = await sbc.from('Tantangan').insert([{ 
+                tipe: tipe, 
+                isi: teks, 
+                pembuat: namaUser 
+            }]);
+            
+            if(error) {
+                console.error(error);
+                alert("Gagal kirim! Pastikan RLS sudah DISABLE & Realtime sudah ENABLE di Supabase.");
+            }
+        }
+
+        async function ambilDataAwal() {
+            const { data } = await sbc.from('Tantangan').select('*').order('id', { ascending: false }).limit(10);
+            if(data) {
+                if(data[0]) updateLayar(data[0], false);
+                // Tampilkan di log (dari yang lama ke baru)
+                data.reverse().forEach(item => masukkanKeLog(item));
+            }
+        }
+
+        function updateLayar(data, tulisLog = true) {
+            document.getElementById('disp-tipe').innerText = data.tipe;
+            document.getElementById('disp-isi').innerText = `"${data.isi}"`;
+            document.getElementById('disp-pembuat').innerText = "Oleh: " + data.pembuat;
+            if(tulisLog) masukkanKeLog(data);
+        }
+
+        function masukkanKeLog(data) {
+            const container = document.getElementById('log-list');
+            const div = document.createElement('div');
+            div.className = "bg-white/5 p-4 rounded-2xl border border-white/5 animate-item";
+            div.innerHTML = `
+                <div class="flex justify-between items-center mb-1">
+                    <span class="text-[9px] font-black text-indigo-400 uppercase tracking-tighter">${data.pembuat}</span>
+                    <span class="text-[7px] text-white/10 italic">Baru saja</span>
+                </div>
+                <p class="text-[11px] opacity-70 italic leading-relaxed">"${data.isi}"</p>
+            `;
+            container.prepend(div);
+            
+            // Batasi log agar tidak terlalu banyak di layar
+            if(container.children.length > 20) {
+                container.removeChild(container.lastChild);
+            }
+        }
+    </script>
+</body>
+</html>
+
