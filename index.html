@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>T/D - Grey Fog Gathering</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Nanum+Myeongjo:wght@400;700&family=UnifrakturMaguntia&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #050608;
+            --fog-grey: #2c3e50;
+            --mystic-purple: #3d2b56;
+            --silver: #bdc3c7;
+            --crimson: #922b21;
+            --dim-gold: #917d4a;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--silver);
+            font-family: 'Nanum+Myeongjo', serif;
+            height: 100dvh;
+            margin: 0;
+            overflow: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .hall-wrapper {
+            width: 100%;
+            max-width: 500px;
+            height: 100%;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            background: radial-gradient(circle at top, #11141d 0%, #050608 100%);
+            position: relative;
+        }
+
+        .fog-overlay {
+            position: absolute;
+            inset: 0;
+            background: url('https://www.transparenttextures.com/patterns/asfalt-dark.png');
+            opacity: 0.1;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .mystic-header {
+            padding: 15px 20px;
+            border-bottom: 1px solid rgba(189, 195, 199, 0.1);
+            z-index: 50;
+            background: rgba(5, 6, 8, 0.85);
+            backdrop-filter: blur(10px);
+        }
+
+        .main-title {
+            font-family: 'UnifrakturMaguntia', cursive;
+            font-size: 2.2rem;
+            color: var(--silver);
+            text-shadow: 0 0 15px rgba(189, 195, 199, 0.2);
+        }
+
+        .btn-mystic {
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            user-select: none;
+            touch-action: manipulation;
+        }
+
+        .btn-mystic:active {
+            transform: scale(0.92);
+            filter: brightness(1.3);
+        }
+
+        #altar-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(5, 6, 8, 0.98);
+            z-index: 100;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 30px;
+            backdrop-filter: blur(8px);
+        }
+
+        /* Card Shuffling Animation */
+        @keyframes shuffle {
+            0% { transform: scale(1) rotate(0deg); filter: blur(0); }
+            25% { transform: scale(0.95) rotate(-2deg); filter: blur(2px); }
+            50% { transform: scale(1.05) rotate(2deg); filter: blur(4px); }
+            75% { transform: scale(0.98) rotate(-1deg); filter: blur(2px); }
+            100% { transform: scale(1) rotate(0deg); filter: blur(0); }
+        }
+
+        .shuffling {
+            animation: shuffle 0.6s infinite ease-in-out;
+        }
+
+        .tarot-display {
+            background: linear-gradient(145deg, #0d0f15, #050608);
+            border: 1px solid rgba(189, 195, 199, 0.1);
+            padding: 20px;
+            border-radius: 4px;
+            text-align: center;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            transition: all 0.5s ease;
+        }
+
+        .spiritual-threads {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px 20px;
+            display: flex;
+            flex-direction: column-reverse;
+            z-index: 10;
+        }
+
+        .thread-msg {
+            margin-bottom: 16px;
+            padding: 12px 16px;
+            max-width: 88%;
+            border-radius: 2px;
+            animation: emerge 0.4s ease-out forwards;
+        }
+
+        @keyframes emerge {
+            from { opacity: 0; transform: translateY(15px); filter: blur(4px); }
+            to { opacity: 1; transform: translateY(0); filter: blur(0); }
+        }
+
+        .my-thread { align-self: flex-end; background: rgba(61, 43, 86, 0.15); border-right: 2px solid var(--mystic-purple); }
+        .others-thread { align-self: flex-start; background: rgba(44, 62, 80, 0.1); border-left: 2px solid var(--fog-grey); }
+
+        .sender-tag {
+            font-family: 'Cinzel', serif;
+            font-size: 0.55rem;
+            color: var(--dim-gold);
+            letter-spacing: 2px;
+            margin-bottom: 4px;
+            display: block;
+            text-transform: uppercase;
+        }
+
+        .altar-footer {
+            background: #030405;
+            padding: 15px 20px;
+            border-top: 1px solid rgba(189, 195, 199, 0.08);
+            z-index: 50;
+            padding-bottom: calc(15px + env(safe-area-inset-bottom));
+        }
+
+        .mystic-input {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(189, 195, 199, 0.1);
+            color: #ffffff;
+            padding: 12px;
+            border-radius: 4px;
+            outline: none;
+            width: 100%;
+            font-size: 14px;
+        }
+
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+
+        /* History Overlay */
+        #history-overlay {
+            position: absolute;
+            inset: 0;
+            background: #050608;
+            z-index: 101;
+            display: none;
+            flex-direction: column;
+            padding: 20px;
+        }
+
+        .history-item {
+            border-bottom: 1px solid rgba(189, 195, 199, 0.05);
+            padding: 12px 0;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="fog-overlay"></div>
+
+    <!-- LOGIN -->
+    <div id="v-login" class="fixed inset-0 z-[120] flex items-center justify-center bg-[#050608] p-10 transition-opacity duration-700">
+        <div class="text-center w-full max-w-xs">
+            <h1 class="main-title mb-2">T/D</h1>
+            <p class="text-[8px] tracking-[6px] text-dim-gold uppercase mb-16">The Fool's Sanctuary</p>
+            <div class="space-y-6">
+                <input id="in-nick" type="text" maxlength="15" placeholder="Gelar Beyonder..." 
+                    class="mystic-input text-center bg-transparent border-b border-silver/20 rounded-none focus:border-silver">
+                <button onclick="startApp()" class="btn-mystic w-full py-4 border border-silver text-silver font-cinzel text-[10px] tracking-[3px] uppercase">Masuk Kabut</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN APP -->
+    <div id="v-main" class="hidden hall-wrapper">
+        
+        <!-- HISTORY OVERLAY -->
+        <div id="history-overlay">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="font-cinzel text-dim-gold text-[10px] tracking-[4px] uppercase">Riwayat Takdir</h2>
+                <button onclick="toggleHistory(false)" class="text-silver/40 text-[10px] font-cinzel tracking-widest uppercase">Tutup</button>
+            </div>
+            <div id="history-list" class="flex-1 overflow-y-auto no-scrollbar space-y-1">
+                <!-- History items go here -->
+            </div>
+        </div>
+
+        <!-- ALTAR OVERLAY (MENU HAPUS) -->
+        <div id="altar-overlay">
+            <h2 class="font-cinzel text-dim-gold text-[10px] tracking-[4px] mb-12 uppercase">Meja Pemurnian</h2>
+            <div class="space-y-4 w-full max-w-xs">
+                <button onclick="toggleHistory(true); toggleMenu(false);" class="btn-mystic w-full py-5 border border-silver/30 text-silver font-cinzel text-[9px] tracking-[3px] uppercase">Lihat Riwayat T/D</button>
+                <div class="h-[1px] bg-silver/10 my-4"></div>
+                <button onclick="wipeOut('pesan')" class="btn-mystic w-full py-5 border border-crimson text-crimson font-cinzel text-[9px] tracking-[3px] uppercase">Musnahkan Pesan</button>
+                <button onclick="wipeOut('game')" class="btn-mystic w-full py-5 border border-crimson/50 text-crimson/50 font-cinzel text-[9px] tracking-[3px] uppercase">Reset Takdir</button>
+                <button onclick="toggleMenu(false)" class="btn-mystic w-full py-4 text-gray-600 font-cinzel text-[8px] tracking-[2px] uppercase mt-8">Kembali</button>
+            </div>
+        </div>
+
+        <header class="mystic-header">
+            <div class="flex justify-between items-center">
+                <div onclick="toggleMenu(true)" class="btn-mystic p-2 text-silver/60">
+                    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16m-7 6h7"/></svg>
+                </div>
+                <h1 class="main-title text-2xl">T/D</h1>
+                <div onclick="location.reload()" class="btn-mystic p-2 text-silver/60">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                </div>
+            </div>
+        </header>
+
+        <!-- TAROT ZONE -->
+        <div class="p-5 z-10">
+            <div id="tarot-card" class="tarot-display">
+                <span id="q-type" class="text-[8px] uppercase tracking-[4px] text-dim-gold mb-3 block opacity-60">Ramalan Takdir</span>
+                <p id="q-text" class="text-white text-base italic leading-relaxed min-h-[50px] flex items-center justify-center">Ketuk tombol di bawah...</p>
+                <button id="btn-draw" onclick="drawChallenge()" class="btn-mystic mt-6 w-full py-3 border border-dim-gold/40 text-dim-gold text-[9px] uppercase tracking-[2px]">Ramal Nasib</button>
+            </div>
+        </div>
+
+        <!-- CHAT LIST -->
+        <div id="c-list" class="spiritual-threads no-scrollbar"></div>
+
+        <!-- FOOTER -->
+        <footer class="altar-footer">
+            <div class="flex flex-col gap-4">
+                <div class="flex justify-between items-center px-1">
+                    <label class="flex items-center gap-2 cursor-pointer group">
+                        <input type="checkbox" id="check-once" class="hidden peer">
+                        <div class="w-4 h-4 border border-silver/20 peer-checked:bg-crimson peer-checked:border-crimson transition-all"></div>
+                        <span class="text-[8px] uppercase tracking-[3px] text-silver/30 peer-checked:text-crimson">Segel Mantra</span>
+                    </label>
+                    <div id="up-status" class="hidden text-[8px] text-dim-gold animate-pulse">MEMBENTUK SPIRIT...</div>
+                </div>
+
+                <div class="flex gap-3 items-center">
+                    <input type="file" id="in-file" accept="image/*" class="hidden" onchange="handleFileUpload(this)">
+                    <button onclick="document.getElementById('in-file').click()" class="btn-mystic text-silver/30">
+                        <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                    </button>
+                    <form onsubmit="event.preventDefault(); sendMessage();" class="flex-1 flex gap-2">
+                        <input id="c-input" type="text" autocomplete="off" placeholder="Bisikkan doamu..." class="mystic-input">
+                        <button type="submit" class="btn-mystic px-5 bg-silver text-black rounded-sm">
+                            <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        const CONFIG = {
+            URL: 'https://rruxlxoeelxjjjmhafkc.supabase.co',
+            KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJydXhseG9lZWx4ampqbWhhZmtjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk3NDU5OTMsImV4cCI6MjA4NTMyMTk5M30.oR2hl_BDD1P6Dmtos2So-aJ_eoFl1-Kwybt6mQnvq0Q',
+            QUESTS: {
+                TRUTH: ["Siapa orang yang paling Anda curigai di sini?", "Apa rahasia paling memalukan yang Anda simpan?", "Pernahkah Anda berkhianat demi keuntungan?", "Sebutkan satu hal yang Anda benci dari diri sendiri.", "Apa ketakutan terbesar Anda saat ini?"],
+                DARE: ["Tunjukkan benda paling aneh di sekitar Anda.", "Lakukan pose meditasi selama 1 menit.", "Ganti gaya bicara Anda menjadi sangat formal.", "Lakukan tarian konyol selama 15 detik.", "Ucapkan rahasia Beyonder keras-keras."]
+            }
+        };
+
+        const supa = supabase.createClient(CONFIG.URL, CONFIG.KEY);
+        let state = { nick: "", rendered: new Set(), opened: new Set(JSON.parse(localStorage.getItem('hall_opened')) || []) };
+
+        async function startApp() {
+            state.nick = document.getElementById('in-nick').value.trim() || "The Nameless";
+            document.getElementById('v-login').style.opacity = '0';
+            setTimeout(async () => {
+                document.getElementById('v-login').classList.add('hidden');
+                document.getElementById('v-main').classList.remove('hidden');
+                await supa.auth.signInAnonymously();
+                supa.channel('hall').on('postgres_changes', { event: '*', schema: 'public', table: 'Pesan' }, fetchChat).subscribe();
+                supa.channel('hall').on('postgres_changes', { event: '*', schema: 'public', table: 'Tantangan' }, fetchGame).subscribe();
+                fetchChat(); fetchGame();
+            }, 600);
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('c-input');
+            const once = document.getElementById('check-once');
+            let text = input.value.trim(); if(!text) return;
+            if(once.checked) { text = `ONCE:${text}`; once.checked = false; }
+            input.value = "";
+            await supa.from('Pesan').insert([{ nama: state.nick, teks: text }]);
+        }
+
+        async function fetchChat() {
+            const { data } = await supa.from('Pesan').select('*').order('id', { ascending: false }).limit(30);
+            const box = document.getElementById('c-list');
+            if(!data) return;
+
+            data.forEach(msg => {
+                if(state.rendered.has(msg.id)) return;
+                const isMe = msg.nama === state.nick;
+                const isOnce = msg.teks.startsWith('ONCE:');
+                const raw = isOnce ? msg.teks.replace('ONCE:', '') : msg.teks;
+                const isImg = raw.startsWith('IMG:');
+                const isOpened = state.opened.has(msg.id.toString());
+                
+                const div = document.createElement('div');
+                div.className = `thread-msg ${isMe ? 'my-thread' : 'others-thread'}`;
+                
+                let content = "";
+                if(isOnce && isOpened) content = `<span class="opacity-20 italic text-[10px]">Mantra telah sirna...</span>`;
+                else if(isOnce) content = `<button onclick="openSecret('${msg.id}', '${raw}')" class="btn-mystic bg-crimson/80 text-white text-[8px] px-3 py-1 tracking-widest uppercase">Buka Segel</button>`;
+                else if(isImg) content = `<img src="${raw.replace('IMG:', '').split('?')[0]}" class="w-full rounded-sm grayscale opacity-80 border border-white/5">`;
+                else content = `<span class="text-white/90 text-sm leading-relaxed">${raw}</span>`;
+
+                div.innerHTML = `<span class="sender-tag">${msg.nama}</span>${content}`;
+                box.prepend(div);
+                state.rendered.add(msg.id);
+            });
+        }
+
+        async function fetchGame() {
+            const { data } = await supa.from('Tantangan').select('*').order('id', { ascending: false }).limit(1);
+            if(data?.[0]) {
+                const card = document.getElementById('tarot-card');
+                document.getElementById('q-type').innerText = `Takdir: ${data[0].tipe}`;
+                document.getElementById('q-text').innerText = data[0].isi;
+            }
+        }
+
+        async function drawChallenge() {
+            const card = document.getElementById('tarot-card');
+            const btn = document.getElementById('btn-draw');
+            
+            // Animasi Acak
+            card.classList.add('shuffling');
+            btn.disabled = true;
+            document.getElementById('q-text').innerText = "Mengguncang Kabut Kelabu...";
+            
+            setTimeout(async () => {
+                const cat = Math.random() > 0.5 ? 'TRUTH' : 'DARE';
+                const res = CONFIG.QUESTS[cat][Math.floor(Math.random() * CONFIG.QUESTS[cat].length)];
+                await supa.from('Tantangan').insert([{ tipe: cat, isi: res, pembuat: state.nick }]);
+                card.classList.remove('shuffling');
+                btn.disabled = false;
+            }, 1200);
+        }
+
+        async function toggleHistory(show) {
+            const overlay = document.getElementById('history-overlay');
+            if (show) {
+                overlay.style.display = 'flex';
+                const { data } = await supa.from('Tantangan').select('*').order('id', { ascending: false }).limit(50);
+                const list = document.getElementById('history-list');
+                list.innerHTML = data?.map(item => `
+                    <div class="history-item">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-[8px] font-cinzel text-dim-gold">${item.tipe}</span>
+                            <span class="text-[7px] text-silver/30">${item.pembuat}</span>
+                        </div>
+                        <p class="text-xs text-white/80 italic">"${item.isi}"</p>
+                    </div>
+                `).join('') || '<p class="text-[8px] text-silver/20 text-center py-10">Belum ada takdir yang tertulis.</p>';
+            } else {
+                overlay.style.display = 'none';
+            }
+        }
+
+        async function handleFileUpload(el) {
+            const file = el.files[0]; if(!file) return;
+            document.getElementById('up-status').classList.remove('hidden');
+            const path = `hall_${Date.now()}.${file.name.split('.').pop()}`;
+            const { error } = await supa.storage.from('bukti').upload(path, file);
+            if(!error) {
+                const { data } = supa.storage.from('bukti').getPublicUrl(path);
+                await sendMessage(`IMG:${data.publicUrl}?file=${path}`);
+            }
+            document.getElementById('up-status').classList.add('hidden');
+            el.value = "";
+        }
+
+        function openSecret(id, raw) {
+            alert(`Pesan Rahasia:\n\n"${raw}"`);
+            state.opened.add(id.toString());
+            localStorage.setItem('hall_opened', JSON.stringify([...state.opened]));
+            state.rendered.delete(parseInt(id)); fetchChat();
+        }
+
+        function toggleMenu(show) {
+            document.getElementById('altar-overlay').style.display = show ? 'flex' : 'none';
+        }
+
+        async function wipeOut(mode) {
+            if(!confirm("Hancurkan jejak spiritual ini?")) return;
+            if(mode === 'pesan') {
+                const { data } = await supa.from('Pesan').select('teks');
+                const files = data?.filter(m => m.teks.includes('?file=')).map(m => m.teks.split('?file=')[1]) || [];
+                if(files.length) await supa.storage.from('bukti').remove(files);
+                await supa.from('Pesan').delete().neq('id', 0);
+                state.rendered.clear(); 
+                document.getElementById('c-list').innerHTML = "";
+            } else {
+                await supa.from('Tantangan').delete().neq('id', 0);
+            }
+            toggleMenu(false);
+        }
+    </script>
+</body>
+</html>
+
