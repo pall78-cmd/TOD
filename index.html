@@ -1,0 +1,250 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { Ghost, Flame, RotateCcw, Play, History, Trophy, Info } from 'lucide-react';
+
+const TRUTH_DATA = [
+  "Siapa orang yang terakhir kamu stalking di media sosial?",
+  "Apa kebohongan terbesar yang pernah kamu katakan kepada orang tuamu?",
+  "Apa rahasia yang belum pernah kamu ceritakan kepada siapa pun di ruangan ini?",
+  "Siapa cinta pertamamu dan apa yang kamu sukai darinya?",
+  "Apa hal paling memalukan yang pernah kamu lakukan saat kencan?",
+  "Jika kamu bisa bertukar nasib dengan seseorang di sini, siapa itu?",
+  "Apa ketakutan terbesarmu dalam sebuah hubungan?",
+  "Pernahkah kamu berpura-pura sakit untuk menghindari acara sosial?",
+  "Apa kesan pertama kamu terhadap orang di sebelah kananmu?",
+  "Apa aplikasi paling aneh yang ada di ponselmu saat ini?",
+  "Siapa orang di ruangan ini yang menurutmu paling menarik?",
+  "Pernahkah kamu mengirim pesan ke orang yang salah tentang orang tersebut?",
+  "Apa hal paling kekanak-kanakan yang masih kamu lakukan sampai sekarang?",
+  "Berapa banyak mantan yang masih kamu simpan kontaknya?",
+  "Apa mimpi teraneh yang pernah kamu alami?",
+  "Jika kamu memenangkan lotre, apa hal pertama yang akan kamu beli?",
+  "Apa hal paling menjijikkan yang pernah kamu lakukan sendirian?",
+  "Pernahkah kamu menyukai pacar temanmu sendiri?",
+  "Apa bagian tubuhmu yang paling kamu banggakan?",
+  "Apa kesalahan terbesar yang pernah kamu buat di tempat kerja/sekolah?",
+  "Siapa orang terakhir yang membuatmu menangis?",
+  "Apa bakat tersembunyimu yang tidak diketahui banyak orang?",
+  "Apa hal paling egois yang pernah kamu lakukan?",
+  "Jika kamu bisa menghapus satu kenangan, kenangan apa itu?",
+  "Apa pendapatmu yang paling kontroversial?",
+  "Pernahkah kamu mencuri sesuatu, sekecil apa pun itu?",
+  "Siapa selebriti yang menjadi 'guilty pleasure' mu?",
+  "Apa hal terakhir yang kamu cari di Google secara incognito?",
+  "Apa kriteria pasangan idamanmu yang paling tidak masuk akal?",
+  "Apa hal yang paling kamu sesali dalam hidup sejauh ini?",
+  "Pernahkah kamu merasa iri dengan pencapaian teman baikmu?"
+];
+
+const DARE_DATA = [
+  "Lakukan plank selama 1 menit tanpa berhenti.",
+  "Biarkan orang di sebelah kirimu mengirim satu pesan singkat ke siapa pun di kontakmu.",
+  "Telepon kontak ke-5 di daftar log teleponmu dan nyanyikan lagu 'Happy Birthday'.",
+  "Tunjukkan foto paling memalukan di galeri ponselmu.",
+  "Gunakan kaus kaki di tanganmu sampai giliranmu berikutnya.",
+  "Bicaralah dengan aksen asing (misal: Inggris, Medok, atau India) selama 2 putaran.",
+  "Makan satu sendok makan kecap dicampur saus sambal.",
+  "Lakukan dance TikTok populer selama 30 detik tanpa musik.",
+  "Biarkan seseorang merias wajahmu dengan mata tertutup.",
+  "Berikan ponselmu kepada pemain lain dan biarkan mereka melihat DM Instagram-mu selama 1 menit.",
+  "Peragakan seekor binatang sampai ada yang bisa menebaknya.",
+  "Coba masukkan seluruh jempol tanganmu ke dalam mulut.",
+  "Kirim pesan 'Aku kangen' ke mantan atau gebetanmu saat ini.",
+  "Lakukan 20 kali push-up sekarang juga.",
+  "Biarkan orang lain menggelitikmu selama 30 detik tanpa kamu boleh melawan.",
+  "Ganti foto profil WhatsApp-mu dengan foto konyol selama 1 jam.",
+  "Bacakan dengan lantang isi chat terakhirmu dengan ibumu.",
+  "Ulangi setiap kata yang diucapkan orang di sebelah kananmu sampai giliranmu lagi.",
+  "Berdiri di luar rumah/ruangan dan teriak 'Aku cinta kamu!' dengan keras.",
+  "Biarkan seseorang menggambar sesuatu di wajahmu menggunakan spidol/lipstik.",
+  "Minum satu gelas air tanpa menggunakan tangan.",
+  "Ceritakan lelucon paling garing yang kamu tahu sampai ada yang tertawa.",
+  "Lakukan gaya fashion show di tengah ruangan.",
+  "Biarkan temanmu membuat status Facebook/IG Story dari akunmu.",
+  "Berikan pijatan bahu kepada orang di sebelah kirimu selama 2 menit.",
+  "Tutup mata dan biarkan seseorang menyuapimu makanan misterius dari dapur.",
+  "Coba sentuh hidungmu dengan lidah.",
+  "Lakukan sit-up sebanyak 25 kali.",
+  "Tiru gaya bicara salah satu pemain di sini sampai mereka merasa terhina (bercanda).",
+  "Tunjukkan riwayat pesanan makanan online terakhirmu.",
+  "Pura-pura menjadi pelayan dan tawarkan minuman kepada setiap pemain."
+];
+
+export default function App() {
+  const [currentMode, setCurrentMode] = useState(null); // 'truth' or 'dare'
+  const [content, setContent] = useState('');
+  const [history, setHistory] = useState([]);
+  const [stats, setStats] = useState({ truth: 0, dare: 0 });
+  const [isSpinning, setIsSpinning] = useState(false);
+  const [pityCounter, setPityCounter] = useState(0); // Positif cenderung ke dare, negatif ke truth
+
+  // Fungsi Pity Logic 50:50
+  // Jika terlalu sering keluar Truth, peluang Dare meningkat, dan sebaliknya.
+  const getRandomType = () => {
+    const baseChance = 0.5;
+    // Semakin tinggi pityCounter (banyak truth berturut-turut), semakin besar peluang dapat dare
+    // Threshold pitty aktif jika sudah 2x berturut-turut jenis yang sama
+    const adjustment = pityCounter * 0.15; 
+    const dareThreshold = baseChance + adjustment;
+    
+    return Math.random() < dareThreshold ? 'dare' : 'truth';
+  };
+
+  const handlePlay = () => {
+    setIsSpinning(true);
+    setContent('');
+    
+    // Simulasi loading/acak
+    setTimeout(() => {
+      const type = getRandomType();
+      const dataSource = type === 'truth' ? TRUTH_DATA : DARE_DATA;
+      const randomIndex = Math.floor(Math.random() * dataSource.length);
+      const selectedContent = dataSource[randomIndex];
+
+      setCurrentMode(type);
+      setContent(selectedContent);
+      setStats(prev => ({ ...prev, [type]: prev[type] + 1 }));
+      setHistory(prev => [{ type, text: selectedContent, id: Date.now() }, ...prev].slice(0, 10));
+      
+      // Update Pity Counter
+      // Jika dapat dare, tambahkan ke arah negatif. Jika truth, tambahkan ke arah positif.
+      if (type === 'truth') {
+        setPityCounter(prev => prev + 1);
+      } else {
+        setPityCounter(prev => prev - 1);
+      }
+
+      setIsSpinning(false);
+    }, 800);
+  };
+
+  const resetGame = () => {
+    setCurrentMode(null);
+    setContent('');
+    setHistory([]);
+    setStats({ truth: 0, dare: 0 });
+    setPityCounter(0);
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-900 text-white font-sans p-4 flex flex-col items-center justify-center">
+      {/* Header */}
+      <div className="max-w-md w-full text-center mb-8">
+        <h1 className="text-4xl font-black tracking-tighter bg-gradient-to-r from-cyan-400 to-fuchsia-500 bg-clip-text text-transparent italic">
+          TRUTH OR DARE
+        </h1>
+        <p className="text-slate-400 text-sm mt-2 flex items-center justify-center gap-1">
+          <Info size={14} /> Sistem Pity 50:50 Aktif (Adil)
+        </p>
+      </div>
+
+      {/* Main Card */}
+      <div className="max-w-md w-full bg-slate-800 border border-slate-700 rounded-3xl shadow-2xl overflow-hidden relative">
+        <div className="p-8 flex flex-col items-center min-h-[320px] justify-center text-center">
+          {!currentMode && !isSpinning ? (
+            <div className="space-y-4">
+              <div className="w-20 h-20 bg-slate-700 rounded-full flex items-center justify-center mx-auto animate-bounce">
+                <Play size={32} className="text-cyan-400 ml-1" />
+              </div>
+              <h2 className="text-xl font-bold text-slate-300">Siap untuk bermain?</h2>
+              <p className="text-slate-500 text-sm">Tekan tombol di bawah untuk menentukan nasibmu!</p>
+            </div>
+          ) : isSpinning ? (
+            <div className="flex flex-col items-center gap-4">
+              <div className="w-16 h-16 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin"></div>
+              <p className="text-cyan-400 font-medium animate-pulse">Mengacak Nasib...</p>
+            </div>
+          ) : (
+            <div className={`animate-in fade-in zoom-in duration-300 flex flex-col items-center`}>
+              <div className={`mb-4 px-4 py-1 rounded-full text-xs font-bold uppercase tracking-widest ${
+                currentMode === 'truth' ? 'bg-cyan-500/20 text-cyan-400' : 'bg-fuchsia-500/20 text-fuchsia-400'
+              }`}>
+                {currentMode}
+              </div>
+              
+              <div className="mb-6">
+                {currentMode === 'truth' ? (
+                  <Ghost size={64} className="text-cyan-400 drop-shadow-[0_0_15px_rgba(34,211,238,0.5)]" />
+                ) : (
+                  <Flame size={64} className="text-fuchsia-500 drop-shadow-[0_0_15px_rgba(217,70,239,0.5)]" />
+                )}
+              </div>
+
+              <p className="text-2xl font-semibold leading-tight text-white px-2">
+                "{content}"
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Action Buttons */}
+        <div className="p-6 bg-slate-800/50 border-t border-slate-700 grid grid-cols-4 gap-3">
+          <button 
+            onClick={handlePlay}
+            disabled={isSpinning}
+            className="col-span-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 active:scale-95 transition-all py-4 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-cyan-900/20 disabled:opacity-50"
+          >
+            {currentMode ? "LANJUT LAGI" : "MULAI ACAK"}
+            <Play size={20} fill="currentColor" />
+          </button>
+          
+          <button 
+            onClick={resetGame}
+            className="col-span-1 bg-slate-700 hover:bg-slate-600 active:scale-95 transition-all py-4 rounded-2xl flex items-center justify-center text-slate-300"
+            title="Reset Game"
+          >
+            <RotateCcw size={20} />
+          </button>
+        </div>
+      </div>
+
+      {/* Stats & History */}
+      <div className="max-w-md w-full mt-8 grid grid-cols-2 gap-4">
+        <div className="bg-slate-800/40 border border-slate-700/50 p-4 rounded-2xl flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-cyan-500/10 rounded-lg">
+              <Ghost size={18} className="text-cyan-400" />
+            </div>
+            <div>
+              <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Truth</p>
+              <p className="text-xl font-bold">{stats.truth}</p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-slate-800/40 border border-slate-700/50 p-4 rounded-2xl flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-fuchsia-500/10 rounded-lg">
+              <Flame size={18} className="text-fuchsia-400" />
+            </div>
+            <div>
+              <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Dare</p>
+              <p className="text-xl font-bold">{stats.dare}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Recent History List */}
+      {history.length > 0 && (
+        <div className="max-w-md w-full mt-6 bg-slate-800/30 border border-slate-700/30 rounded-2xl p-4">
+          <div className="flex items-center gap-2 mb-3 text-slate-400 text-xs font-bold uppercase tracking-widest">
+            <History size={14} /> Riwayat Terakhir
+          </div>
+          <div className="space-y-2">
+            {history.map((item, idx) => (
+              <div key={item.id} className="flex gap-3 items-start animate-in slide-in-from-left duration-300" style={{ animationDelay: `${idx * 50}ms` }}>
+                <span className={`mt-1 shrink-0 w-1.5 h-1.5 rounded-full ${item.type === 'truth' ? 'bg-cyan-500' : 'bg-fuchsia-500'}`}></span>
+                <p className="text-xs text-slate-400 line-clamp-1 italic">{item.text}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Bottom Footer */}
+      <p className="mt-8 text-slate-600 text-[10px] uppercase tracking-[0.2em]">
+        Handcrafted for Fun • Version 1.0
+      </p>
+    </div>
+  );
+}
+
