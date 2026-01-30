@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>T/D - Grey Fog Gathering</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600&family=Nanum+Myeongjo:wght@400;700&family=UnifrakturMaguntia&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-deep: #0a0c10;
+            --accent-gold: #f1c40f; /* Emas terang untuk visibilitas */
+            --text-main: #ffffff;    /* Putih murni untuk teks utama */
+            --text-sub: #bdc3c7;     /* Abu terang untuk teks sekunder */
+            --mystic-purple: #5b2c91;
+            --crimson: #e74c3c;
+        }
+
+        body {
+            background-color: var(--bg-deep);
+            color: var(--text-main);
+            font-family: 'Nanum Myeongjo', serif;
+            height: 100dvh;
+            margin: 0;
+            overflow: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .hall-wrapper {
+            width: 100%;
+            max-width: 500px;
+            height: 100%;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            background: #0d1117;
+            position: relative;
+        }
+
+        /* Optimalisasi Animasi: Hanya menggunakan transform & opacity */
+        @keyframes draw-pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.02); opacity: 0.8; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .shuffling {
+            animation: draw-pulse 0.4s infinite ease-in-out;
+            pointer-events: none;
+        }
+
+        /* Komponen UI dengan kontras tinggi */
+        .tarot-display {
+            background: #161b22;
+            border: 2px solid rgba(241, 196, 15, 0.3);
+            padding: 24px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .spiritual-threads {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+            display: flex;
+            flex-direction: column-reverse;
+            background: #0d1117;
+        }
+
+        .thread-msg {
+            margin-bottom: 12px;
+            padding: 12px 16px;
+            max-width: 85%;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+
+        .my-thread { 
+            align-self: flex-end; 
+            background: var(--mystic-purple); 
+            color: white;
+        }
+
+        .others-thread { 
+            align-self: flex-start; 
+            background: #21262d; 
+            color: white;
+            border: 1px solid #30363d;
+        }
+
+        .sender-name {
+            font-family: 'Cinzel', serif;
+            font-size: 10px;
+            color: var(--accent-gold);
+            letter-spacing: 1px;
+            margin-bottom: 4px;
+            display: block;
+            font-weight: bold;
+        }
+
+        .btn-action {
+            background: var(--accent-gold);
+            color: black;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: transform 0.1s;
+        }
+
+        .btn-action:active { transform: scale(0.96); }
+
+        .overlay-screen {
+            position: absolute;
+            inset: 0;
+            background: #0d1117;
+            z-index: 100;
+            display: none;
+            flex-direction: column;
+            padding: 20px;
+        }
+
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body>
+
+    <!-- LOGIN -->
+    <div id="v-login" class="fixed inset-0 z-[200] flex items-center justify-center bg-[#0a0c10] p-10">
+        <div class="text-center w-full max-w-xs">
+            <h1 class="font-unifraktur text-6xl text-white mb-6">T/D</h1>
+            <p class="text-[10px] tracking-[5px] text-accent-gold uppercase mb-12">Grey Fog Gathering</p>
+            <div class="space-y-4">
+                <input id="in-nick" type="text" maxlength="15" placeholder="Gelar Beyonder..." 
+                    class="w-full bg-[#161b22] border-2 border-[#30363d] p-4 text-center rounded-lg text-white outline-none focus:border-accent-gold">
+                <button onclick="startApp()" class="w-full py-4 btn-action rounded-lg text-sm">Masuk Kabut</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- APP MAIN -->
+    <div id="v-main" class="hidden hall-wrapper">
+        
+        <!-- HISTORY OVERLAY -->
+        <div id="history-overlay" class="overlay-screen">
+            <div class="flex justify-between items-center mb-6 border-b border-[#30363d] pb-4">
+                <h2 class="font-cinzel text-accent-gold text-sm">RIWAYAT TAKDIR</h2>
+                <button onclick="closeOverlays()" class="text-white font-bold bg-[#21262d] px-4 py-2 rounded">X</button>
+            </div>
+            <div id="history-list" class="flex-1 overflow-y-auto no-scrollbar space-y-3"></div>
+        </div>
+
+        <!-- MENU OVERLAY -->
+        <div id="menu-overlay" class="overlay-screen justify-center items-center">
+            <div class="w-full max-w-xs space-y-4">
+                <h3 class="text-center font-cinzel text-accent-gold mb-8">PENGATURAN</h3>
+                <button onclick="showHistory()" class="w-full py-5 bg-[#21262d] text-white font-bold rounded-lg border border-[#30363d]">LIHAT RIWAYAT T/D</button>
+                <button onclick="wipeOut()" class="w-full py-5 bg-red-900/30 text-red-500 font-bold rounded-lg border border-red-900/50">HAPUS SEMUA PESAN</button>
+                <button onclick="closeOverlays()" class="w-full py-4 text-gray-500 uppercase text-xs mt-10">KEMBALI</button>
+            </div>
+        </div>
+
+        <header class="p-4 flex justify-between items-center border-b border-[#30363d] bg-[#161b22]">
+            <button onclick="toggleMenu(true)" class="text-white"><svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16m-7 6h7"/></svg></button>
+            <span class="font-unifraktur text-3xl text-white">T/D</span>
+            <button onclick="location.reload()" class="text-white"><svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg></button>
+        </header>
+
+        <!-- GAME SECTION -->
+        <div class="p-4">
+            <div id="tarot-card" class="tarot-display">
+                <span id="q-type" class="text-xs font-bold uppercase tracking-widest text-accent-gold mb-2 block">TAKDIR BELUM DIPILIH</span>
+                <p id="q-text" class="text-white text-lg font-bold min-h-[70px] flex items-center justify-center leading-snug">Klik tombol ramal untuk memulai permainan.</p>
+                <button id="btn-draw" onclick="drawChallenge()" class="btn-action w-full py-4 rounded-lg mt-6 shadow-lg shadow-yellow-900/20">RAMAL NASIB</button>
+            </div>
+        </div>
+
+        <!-- CHAT SECTION -->
+        <div id="c-list" class="spiritual-threads no-scrollbar"></div>
+
+        <!-- INPUT SECTION -->
+        <footer class="p-4 bg-[#161b22] border-t border-[#30363d]">
+            <div class="flex items-center gap-3 mb-4">
+                <input type="checkbox" id="check-once" class="w-5 h-5 accent-red-600">
+                <label for="check-once" class="text-xs font-bold text-white/70 uppercase">Mantra Sekali Lihat (Private)</label>
+            </div>
+            <div class="flex gap-3">
+                <button onclick="document.getElementById('in-file').click()" class="text-accent-gold bg-[#21262d] p-3 rounded-lg"><svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></button>
+                <input type="file" id="in-file" class="hidden" onchange="handleFileUpload(this)">
+                <input id="c-input" type="text" placeholder="Ketik pesan..." class="flex-1 bg-[#0d1117] p-4 rounded-lg text-white border border-[#30363d] focus:border-accent-gold outline-none">
+                <button onclick="sendMessage()" class="btn-action px-6 rounded-lg"><svg width="22" height="22" fill="currentColor" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg></button>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        const CONFIG = {
+            URL: 'https://rruxlxoeelxjjjmhafkc.supabase.co',
+            KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJydXhseG9lZWx4ampqbWhhZmtjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk3NDU5OTMsImV4cCI6MjA4NTMyMTk5M30.oR2hl_BDD1P6Dmtos2So-aJ_eoFl1-Kwybt6mQnvq0Q',
+            QUESTS: {
+                TRUTH: ["Siapa orang yang kamu sukai diam-diam?", "Apa kesalahan terbesarmu tahun ini?", "Pernahkah kamu mencuri sesuatu?", "Apa yang kamu lakukan jika jadi transparan?", "Siapa yang paling menyebalkan di grup ini?"],
+                DARE: ["Telepon teman random dan nyanyikan lagu", "Kirim foto selfie terlucu sekarang", "Push-up 10 kali sambil bilang 'Saya raja'", "Berikan 1 rahasia kecilmu di chat", "Ganti foto profilmu jadi gambar lucu"]
+            }
+        };
+
+        const supa = supabase.createClient(CONFIG.URL, CONFIG.KEY);
+        let state = { nick: "", rendered: new Set(), isLocked: false };
+
+        async function startApp() {
+            const nickInput = document.getElementById('in-nick');
+            state.nick = nickInput.value.trim() || "Beyonder";
+            document.getElementById('v-login').classList.add('hidden');
+            document.getElementById('v-main').classList.remove('hidden');
+            
+            await supa.auth.signInAnonymously();
+            
+            // Sync initial data
+            fetchInitialData();
+
+            // Realtime subscriptions - Optimized
+            supa.channel('hall').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'Pesan' }, payload => {
+                renderMsg(payload.new);
+            }).subscribe();
+
+            supa.channel('game').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'Tantangan' }, payload => {
+                applyGameUI(payload.new);
+            }).subscribe();
+        }
+
+        async function fetchInitialData() {
+            const { data: messages } = await supa.from('Pesan').select('*').order('id', { ascending: false }).limit(25);
+            if(messages) messages.reverse().forEach(renderMsg);
+            
+            const { data: lastGame } = await supa.from('Tantangan').select('*').order('id', { ascending: false }).limit(1);
+            if(lastGame?.[0]) applyGameUI(lastGame[0]);
+        }
+
+        function renderMsg(msg) {
+            if(state.rendered.has(msg.id)) return;
+            const box = document.getElementById('c-list');
+            const isMe = msg.nama === state.nick;
+            const isSecret = msg.teks.startsWith('ONCE:');
+            const raw = isSecret ? msg.teks.replace('ONCE:', '') : msg.teks;
+
+            const div = document.createElement('div');
+            div.className = `thread-msg ${isMe ? 'my-thread' : 'others-thread'}`;
+            
+            let content = `<span>${raw}</span>`;
+            if(raw.startsWith('IMG:')) content = `<img src="${raw.replace('IMG:', '')}" class="rounded-lg max-h-52 border border-white/10 mt-2">`;
+            
+            if(isSecret) {
+                content = `<button onclick="this.innerHTML='${raw}'; this.disabled=true;" class="bg-white text-black font-bold px-4 py-2 rounded text-[10px] uppercase">Klik Untuk Melihat</button>`;
+            }
+
+            div.innerHTML = `<span class="sender-name">${msg.nama}</span>${content}`;
+            box.prepend(div);
+            state.rendered.add(msg.id);
+
+            // Optimization: Keep DOM light
+            if(box.children.length > 50) box.removeChild(box.lastChild);
+        }
+
+        async function drawChallenge() {
+            if(state.isLocked) return;
+            state.isLocked = true;
+
+            const btn = document.getElementById('btn-draw');
+            const card = document.getElementById('tarot-card');
+            const text = document.getElementById('q-text');
+
+            btn.disabled = true;
+            card.classList.add('shuffling');
+            text.innerText = "MENGGUNCANG TAKDIR...";
+
+            try {
+                const type = Math.random() > 0.5 ? 'TRUTH' : 'DARE';
+                const list = CONFIG.QUESTS[type];
+                const quest = list[Math.floor(Math.random() * list.length)];
+                
+                await supa.from('Tantangan').insert([{ tipe: type, isi: quest, pembuat: state.nick }]);
+            } catch(e) {
+                text.innerText = "Roh sedang sibuk. Coba lagi.";
+            } finally {
+                setTimeout(() => {
+                    state.isLocked = false;
+                    btn.disabled = false;
+                    card.classList.remove('shuffling');
+                }, 800);
+            }
+        }
+
+        function applyGameUI(data) {
+            document.getElementById('q-type').innerText = `TAKDIR: ${data.tipe}`;
+            document.getElementById('q-text').innerText = `"${data.isi}"`;
+            document.getElementById('tarot-card').classList.remove('shuffling');
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('c-input');
+            const once = document.getElementById('check-once');
+            let val = input.value.trim();
+            if(!val) return;
+
+            if(once.checked) { val = `ONCE:${val}`; once.checked = false; }
+            input.value = "";
+            await supa.from('Pesan').insert([{ nama: state.nick, teks: val }]);
+        }
+
+        async function handleFileUpload(el) {
+            const file = el.files[0]; if(!file) return;
+            const path = `hall_${Date.now()}.${file.name.split('.').pop()}`;
+            const { error } = await supa.storage.from('bukti').upload(path, file);
+            if(!error) {
+                const { data } = supa.storage.from('bukti').getPublicUrl(path);
+                await supa.from('Pesan').insert([{ nama: state.nick, teks: `IMG:${data.publicUrl}` }]);
+            }
+            el.value = "";
+        }
+
+        async function showHistory() {
+            const list = document.getElementById('history-list');
+            list.innerHTML = "<p class='text-center py-10 text-white'>Memanggil Roh...</p>";
+            document.getElementById('history-overlay').style.display = 'flex';
+            
+            const { data } = await supa.from('Tantangan').select('*').order('id', { ascending: false }).limit(30);
+            list.innerHTML = data?.map(i => `
+                <div class="p-4 bg-[#161b22] border border-[#30363d] rounded-lg">
+                    <div class="flex justify-between text-[9px] text-accent-gold mb-2 font-bold">
+                        <span>${i.tipe}</span><span>OLEH: ${i.pembuat}</span>
+                    </div>
+                    <p class="text-white text-sm italic">"${i.isi}"</p>
+                </div>
+            `).join('') || "<p class='text-center py-10'>Kosong...</p>";
+        }
+
+        function toggleMenu(show) { document.getElementById('menu-overlay').style.display = show ? 'flex' : 'none'; }
+        function closeOverlays() { 
+            document.getElementById('menu-overlay').style.display = 'none'; 
+            document.getElementById('history-overlay').style.display = 'none'; 
+        }
+
+        async function wipeOut() {
+            if(!confirm("Musnahkan semua jejak?")) return;
+            await supa.from('Pesan').delete().neq('id', 0);
+            location.reload();
+        }
+    </script>
+</body>
+</html>
+
