@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>TOD PRO - Compact Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap');
+        
+        :root {
+            --bg: #020617;
+            --rose: #f43f5e;
+            --indigo: #6366f1;
+        }
+
+        body { 
+            background: var(--bg); 
+            color: white; 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            height: 100dvh; 
+            display: flex; 
+            flex-direction: column; 
+            overflow: hidden; 
+            margin: 0;
+        }
+
+        .glass { 
+            background: rgba(255, 255, 255, 0.03); 
+            border: 1px solid rgba(255, 255, 255, 0.08); 
+            backdrop-filter: blur(20px); 
+        }
+
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        
+        .btn-tap:active { transform: scale(0.95); }
+        
+        .my-msg { 
+            background: linear-gradient(135deg, var(--indigo) 0%, #4338ca 100%); 
+            border-radius: 1.2rem 1.2rem 0.2rem 1.2rem; 
+        }
+
+        .their-msg { 
+            background: rgba(255, 255, 255, 0.07); 
+            border-radius: 1.2rem 1.2rem 1.2rem 0.2rem; 
+        }
+
+        .view-once-card {
+            background: rgba(244, 63, 94, 0.08);
+            border: 1px dashed rgba(244, 63, 94, 0.3);
+        }
+
+        #viewer-modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 1000;
+            background: rgba(0,0,0,0.95);
+            backdrop-filter: blur(15px);
+            align-items: center;
+            justify-content: center;
+            padding: 15px;
+        }
+
+        /* Ukuran font lebih proporsional untuk mobile */
+        .text-adaptive-xs { font-size: 0.65rem; }
+        .text-adaptive-sm { font-size: 0.85rem; }
+    </style>
+</head>
+<body>
+
+    <!-- SCREEN LOGIN -->
+    <div id="v-login" class="fixed inset-0 z-[100] bg-slate-950 flex flex-col items-center justify-center p-6">
+        <div class="mb-8 text-center">
+            <h1 class="text-5xl font-black italic tracking-tighter uppercase leading-none">TOD <span class="text-rose-500">PRO</span></h1>
+            <p class="text-[8px] font-bold text-slate-500 uppercase tracking-[0.4em] mt-2">Privacy & Fun</p>
+        </div>
+        <div class="glass p-6 rounded-[2.5rem] w-full max-w-xs space-y-3">
+            <input id="in-nick" type="text" maxlength="12" placeholder="Nama Kamu" class="w-full p-4 rounded-xl bg-slate-900 border border-white/10 text-white text-center font-bold outline-none focus:ring-2 ring-rose-500/50">
+            <button onclick="startApp()" class="w-full bg-white p-4 rounded-xl text-slate-950 font-black uppercase tracking-widest text-sm btn-tap">Mulai</button>
+        </div>
+    </div>
+
+    <!-- MAIN APP -->
+    <div id="v-main" class="flex-1 flex flex-col hidden overflow-hidden relative">
+        
+        <!-- HEADER COMPACT -->
+        <header class="px-4 py-3 flex justify-between items-center shrink-0 border-b border-white/5">
+            <div class="flex items-center gap-2">
+                <div class="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
+                <h1 class="font-black italic text-base tracking-tighter">TOD PRO</h1>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="toggleHistory(true)" class="p-2.5 glass rounded-xl text-white/30 btn-tap">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                </button>
+                <button onclick="wipeOutSystem()" class="p-2.5 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-500 btn-tap">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- GAME CARD COMPACT -->
+        <div class="px-4 py-3 shrink-0">
+            <div class="glass p-5 rounded-[2rem] text-center border-white/5 shadow-xl relative overflow-hidden">
+                <div id="g-label" class="text-[7px] font-black text-slate-500 uppercase tracking-[0.4em] mb-2">Tantangan</div>
+                <div class="min-h-[3.5rem] flex items-center justify-center mb-4">
+                    <h2 id="g-isi" class="text-sm font-bold italic text-slate-100 px-2 leading-snug uppercase tracking-tight">"Ketuk Acak untuk Memulai"</h2>
+                </div>
+                <button id="btn-draw" onclick="drawChallenge()" class="w-full bg-white py-3.5 rounded-xl text-slate-950 font-black text-[10px] uppercase tracking-widest btn-tap">
+                    Acak Tantangan
+                </button>
+            </div>
+        </div>
+
+        <!-- CHAT SECTION -->
+        <div class="flex-1 flex flex-col overflow-hidden">
+            <!-- Pesan mengalir dari bawah ke atas -->
+            <div id="c-list" class="flex-1 overflow-y-auto px-4 py-2 space-y-3 no-scrollbar flex flex-col-reverse"></div>
+            
+            <!-- INPUT AREA -->
+            <div class="p-4 bg-slate-950/80 backdrop-blur-md border-t border-white/5">
+                <div class="flex flex-col gap-3">
+                    <div class="flex justify-between items-center px-1">
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" id="check-once" class="hidden peer">
+                            <div class="w-8 h-4 bg-slate-800 rounded-full relative peer-checked:bg-rose-600 transition-all">
+                                <div class="absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-all peer-checked:translate-x-4"></div>
+                            </div>
+                            <span class="text-[8px] font-black uppercase tracking-widest text-slate-500 peer-checked:text-rose-500 transition-all">Sekali Lihat</span>
+                        </label>
+                        <span id="up-status" class="hidden text-[7px] font-black text-indigo-400 animate-pulse uppercase">Upload...</span>
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                        <input type="file" id="in-file" accept="image/*" class="hidden" onchange="handleFileUpload(this)">
+                        <button onclick="document.getElementById('in-file').click()" class="w-12 h-12 flex items-center justify-center rounded-2xl bg-white/5 text-white/40 btn-tap border border-white/5">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7"/><polyline points="16 5 21 5 21 10"/><line x1="12" y1="12" x2="21" y2="3"/></svg>
+                        </button>
+                        
+                        <form onsubmit="event.preventDefault(); sendMessage();" class="flex-1 flex gap-2">
+                            <input id="c-input" type="text" autocomplete="off" placeholder="Ketik pesan..." class="flex-1 bg-slate-900 border border-white/5 rounded-2xl px-5 py-3.5 text-adaptive-sm outline-none focus:ring-1 ring-indigo-500/30">
+                            <button type="submit" class="bg-indigo-600 w-12 h-12 flex items-center justify-center rounded-2xl btn-tap shadow-lg shadow-indigo-500/20">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3.5"><polyline points="22 2 11 13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- VIEWER MODAL -->
+    <div id="viewer-modal" onclick="closeViewer()">
+        <div class="text-center w-full max-w-sm">
+            <img id="viewer-img" src="" class="w-full h-auto rounded-2xl shadow-2xl border border-white/10 mb-4">
+            <p class="text-[9px] font-black uppercase tracking-[0.2em] text-rose-500">Pesan Telah Hangus</p>
+        </div>
+    </div>
+
+    <!-- HISTORY MODAL -->
+    <div id="history-modal" class="fixed inset-0 z-[60] bg-black/95 backdrop-blur-xl hidden flex-col">
+        <div class="p-6 flex justify-between items-center border-b border-white/5">
+            <h3 class="font-black text-xs tracking-widest uppercase text-slate-400">RIWAYAT</h3>
+            <button onclick="toggleHistory(false)" class="text-[10px] font-bold text-rose-500 uppercase">Tutup</button>
+        </div>
+        <div id="history-list" class="flex-1 overflow-y-auto p-6 space-y-3 no-scrollbar"></div>
+    </div>
+
+    <script>
+        const SB_URL = 'https://rruxlxoeelxjjjmhafkc.supabase.co';
+        const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJydXhseG9lZWx4ampqbWhhZmtjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk3NDU5OTMsImV4cCI6MjA4NTMyMTk5M30.oR2hl_BDD1P6Dmtos2So-aJ_eoFl1-Kwybt6mQnvq0Q';
+        const supa = supabase.createClient(SB_URL, SB_KEY);
+
+        let nick = "";
+        let openedItems = JSON.parse(localStorage.getItem('tod_opened_v3')) || [];
+
+        const DATA = {
+            TRUTH: ["Siapa yang terakhir kamu stalking?", "Pernah bohong ke orang di grup ini?", "Apa ketakutan terbesarmu?", "Sebutkan satu rahasia kecilmu."],
+            DARE: ["Tunjukkan riwayat chat terakhir.", "VN nyanyi selama 10 detik.", "Selfie muka paling jelek.", "Telepon teman dan bilang hallo."]
+        };
+
+        async function startApp() {
+            nick = document.getElementById('in-nick').value.trim();
+            if(!nick) return;
+            document.getElementById('v-login').classList.add('hidden');
+            document.getElementById('v-main').classList.remove('hidden');
+            await supa.auth.signInAnonymously();
+            supa.channel('tod_v3')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'Pesan' }, fetchChat)
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'Tantangan' }, fetchGame)
+                .subscribe();
+            fetchChat(); fetchGame();
+        }
+
+        async function sendMessage(manualVal = null) {
+            const input = document.getElementById('c-input');
+            const onceCheck = document.getElementById('check-once');
+            let text = manualVal || input.value.trim();
+            if(!text) return;
+            if(onceCheck.checked) { text = `ONCE:${text}`; onceCheck.checked = false; }
+            await supa.from('Pesan').insert([{ nama: nick, teks: text }]);
+            input.value = "";
+        }
+
+        async function handleFileUpload(el) {
+            const file = el.files[0];
+            if(!file) return;
+            document.getElementById('up-status').classList.remove('hidden');
+            const fileName = `proof_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+            const { data, error } = await supa.storage.from('bukti').upload(fileName, file);
+            if(!error) {
+                const { data: publicUrl } = supa.storage.from('bukti').getPublicUrl(fileName);
+                await sendMessage(`IMG:${publicUrl.publicUrl}?file=${fileName}`);
+            }
+            document.getElementById('up-status').classList.add('hidden');
+            el.value = "";
+        }
+
+        async function fetchChat() {
+            const { data } = await supa.from('Pesan').select('*').order('id', { ascending: false }).limit(30);
+            const box = document.getElementById('c-list');
+            box.innerHTML = "";
+            data?.forEach(msg => {
+                const isMe = msg.nama === nick;
+                const isOnce = msg.teks.startsWith('ONCE:');
+                const raw = isOnce ? msg.teks.replace('ONCE:', '') : msg.teks;
+                const isImg = raw.startsWith('IMG:');
+                const isOpened = openedItems.includes(msg.id);
+
+                const div = document.createElement('div');
+                div.className = `flex flex-col ${isMe ? 'items-end' : 'items-start'} w-full`;
+
+                let content = "";
+                if (isOnce && isOpened) {
+                    content = `<div class="bg-white/5 border border-white/5 px-4 py-2.5 rounded-2xl text-[9px] text-white/20 italic">Sudah Hangus</div>`;
+                } else if (isOnce) {
+                    content = `<div onclick="openViewOnce('${msg.id}', '${raw}')" class="view-once-card px-4 py-2.5 rounded-2xl text-[9px] font-black text-rose-500 uppercase tracking-widest cursor-pointer active:scale-95 transition-all">Buka Rahasia 🔒</div>`;
+                } else if (isImg) {
+                    content = `<div class="${isMe ? 'my-msg' : 'their-msg'} p-1 shadow-lg"><img src="${raw.replace('IMG:', '').split('?')[0]}" class="rounded-xl max-w-[200px] h-auto" loading="lazy"></div>`;
+                } else {
+                    content = `<div class="${isMe ? 'my-msg' : 'their-msg'} px-4 py-2.5 text-adaptive-sm border border-white/5 shadow-sm">${raw}</div>`;
+                }
+
+                div.innerHTML = `<span class="text-[7px] font-bold text-white/20 mb-1 px-2 uppercase">${msg.nama}</span><div class="max-w-[80%]">${content}</div>`;
+                box.appendChild(div);
+            });
+        }
+
+        function openViewOnce(id, raw) {
+            const isImg = raw.startsWith('IMG:');
+            const data = isImg ? raw.replace('IMG:', '').split('?')[0] : raw;
+            if (isImg) { document.getElementById('viewer-img').src = data; document.getElementById('viewer-modal').style.display = 'flex'; }
+            else { alert(`PESAN:\n"${data}"`); }
+            openedItems.push(id);
+            localStorage.setItem('tod_opened_v3', JSON.stringify(openedItems));
+            fetchChat();
+        }
+
+        function closeViewer() { document.getElementById('viewer-modal').style.display = 'none'; document.getElementById('viewer-img').src = ""; }
+
+        async function drawChallenge() {
+            const btn = document.getElementById('btn-draw');
+            const content = document.getElementById('g-isi');
+            btn.disabled = true;
+            content.innerText = "...MENGACAK...";
+            setTimeout(async () => {
+                const category = Math.random() > 0.5 ? 'TRUTH' : 'DARE';
+                const options = DATA[category];
+                const selected = options[Math.floor(Math.random() * options.length)];
+                await supa.from('Tantangan').insert([{ tipe: category, isi: selected, pembuat: nick }]);
+                btn.disabled = false;
+            }, 1000);
+        }
+
+        async function fetchGame() {
+            const { data } = await supa.from('Tantangan').select('*').order('id', { ascending: false }).limit(1);
+            if(data?.[0]) {
+                document.getElementById('g-label').innerText = `Oleh: ${data[0].pembuat}`;
+                document.getElementById('g-isi').innerText = `[${data[0].tipe}] ${data[0].isi}`;
+            }
+        }
+
+        async function wipeOutSystem() {
+            if(!confirm("Hapus semua riwayat chat dan file foto?")) return;
+            const { data } = await supa.from('Pesan').select('teks');
+            const files = data?.filter(m => m.teks.includes('?file=')).map(m => m.teks.split('?file=')[1]) || [];
+            if(files.length) await supa.storage.from('bukti').remove(files);
+            await supa.from('Pesan').delete().neq('id', 0);
+            await supa.from('Tantangan').delete().neq('id', 0);
+            localStorage.removeItem('tod_opened_v3');
+            openedItems = [];
+            location.reload();
+        }
+
+        function toggleHistory(show) { document.getElementById('history-modal').style.display = show ? 'flex' : 'none'; if(show) fetchHistory(); }
+
+        async function fetchHistory() {
+            const { data } = await supa.from('Tantangan').select('*').order('id', { ascending: false });
+            const list = document.getElementById('history-list');
+            list.innerHTML = data?.map(h => `
+                <div class="p-4 glass rounded-2xl">
+                    <div class="flex justify-between mb-1"><span class="text-[8px] font-black ${h.tipe === 'TRUTH' ? 'text-indigo-400' : 'text-rose-400'}">${h.tipe}</span></div>
+                    <p class="text-xs font-bold text-slate-200">${h.isi}</p>
+                    <p class="text-[7px] text-white/20 mt-2 uppercase">By: ${h.pembuat}</p>
+                </div>
+            `).join('') || '';
+        }
+    </script>
+</body>
+</html>
+
