@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Oracle Ascension: Ultimate V3</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=Cormorant+Garamond:ital,wght@0,500;1,500&family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --gold: #D4AF37;
+            --void: #020205;
+        }
+
+        body {
+            background-color: var(--void);
+            color: #f0f0f0;
+            font-family: 'Montserrat', sans-serif;
+            height: 100dvh;
+            width: 100vw;
+            overflow: hidden;
+            margin: 0;
+            touch-action: manipulation;
+        }
+
+        .font-header { font-family: 'Cinzel', serif; }
+        .font-mystic { font-family: 'Cormorant Garamond', serif; }
+
+        #universe {
+            position: fixed; inset: 0; z-index: 0;
+            background: radial-gradient(circle at center, #1a0b2e 0%, #000 100%);
+            transition: transform 2.5s cubic-bezier(0.645, 0.045, 0.355, 1);
+        }
+        .star {
+            position: absolute; background: white; border-radius: 50%;
+            opacity: 0.5;
+        }
+        .ascension-active #universe {
+            transform: translateY(100vh) scale(1.5);
+        }
+        .ascension-active .star {
+            animation: streak 0.8s linear infinite;
+        }
+        @keyframes streak {
+            to { transform: translateY(100vh); opacity: 0; }
+        }
+
+        .layer {
+            position: absolute; inset: 0; z-index: 20;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            padding: 20px;
+            transition: all 0.8s ease-in-out;
+        }
+        .layer-hidden { 
+            opacity: 0; 
+            pointer-events: none; 
+            visibility: hidden;
+            transform: translateY(-20px); 
+        }
+
+        .glass-box {
+            background: rgba(10, 10, 15, 0.8);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(212, 175, 55, 0.2);
+            border-radius: 8px;
+            width: 100%;
+            max-width: 320px;
+        }
+
+        .input-minimal {
+            background: transparent;
+            border-bottom: 1px solid rgba(212, 175, 55, 0.3);
+            color: var(--gold);
+            text-align: center;
+            width: 100%;
+            padding: 10px 0;
+            outline: none;
+            font-size: 1.2rem;
+            transition: 0.3s;
+        }
+        .input-minimal:focus { border-bottom-color: var(--gold); letter-spacing: 2px; }
+
+        .btn-gold {
+            background: rgba(212, 175, 55, 0.1);
+            border: 1px solid var(--gold);
+            color: var(--gold);
+            padding: 12px;
+            font-family: 'Cinzel', serif;
+            font-size: 0.75rem;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            transition: 0.3s;
+            width: 100%;
+        }
+        .btn-gold:active { background: var(--gold); color: black; transform: scale(0.98); }
+
+        #chat-area { scrollbar-width: none; }
+        #chat-area::-webkit-scrollbar { display: none; }
+
+        .sys-bubble {
+            background: linear-gradient(to right, transparent, rgba(212,175,55,0.05), transparent);
+            border-left: 2px solid var(--gold);
+            padding: 10px;
+            margin: 10px 0;
+            font-style: italic;
+            font-size: 0.85rem;
+        }
+
+        .reply-preview {
+            background: rgba(212, 175, 55, 0.1);
+            border-left: 2px solid var(--gold);
+            padding: 4px 8px;
+            font-size: 0.7rem;
+            margin-bottom: 4px;
+            border-radius: 4px;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .mention {
+            color: var(--gold);
+            font-weight: bold;
+            text-shadow: 0 0 5px rgba(212, 175, 55, 0.5);
+        }
+
+        .is-tagged {
+            background: rgba(212, 175, 55, 0.15) !important;
+            border-color: var(--gold) !important;
+        }
+
+        .sag-path {
+            fill: none; stroke: var(--gold); stroke-width: 1.5;
+            stroke-dasharray: 500; stroke-dashoffset: 500;
+        }
+        .draw-anim { animation: draw 2.5s ease-out forwards; }
+        @keyframes draw { to { stroke-dashoffset: 0; } }
+
+        .message-bubble {
+            transition: transform 0.2s;
+            cursor: pointer;
+        }
+        .message-bubble:active { transform: scale(0.98); }
+    </style>
+</head>
+<body class="bg-black">
+
+    <div id="universe"></div>
+
+    <!-- 1. SECURITY -->
+    <div id="layer-sec" class="layer">
+        <div class="text-center space-y-8 w-full max-w-[280px]">
+            <h1 class="font-header text-2xl tracking-[10px]">SANCTUM</h1>
+            <div class="relative">
+                <input id="sec-input" type="password" maxlength="6" class="input-minimal tracking-[15px]" placeholder="••••••">
+                <p class="text-[9px] text-gray-500 mt-4 tracking-widest">HINT: 010304</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. SAGITTARIUS -->
+    <div id="layer-sag" class="layer layer-hidden">
+        <svg class="w-48 h-48" viewBox="0 0 200 200">
+            <path id="sag-svg" class="sag-path" d="M160,40 L130,70 L130,130 L70,130 L40,160 M130,70 L40,70 L20,90" />
+            <circle cx="160" cy="40" r="3" fill="white" class="animate-pulse" />
+            <circle cx="40" cy="160" r="3" fill="white" class="animate-pulse" />
+        </svg>
+        <p class="font-header text-gold text-[10px] tracking-[8px] mt-4">SAGITTARIUS</p>
+    </div>
+
+    <!-- 3. IDENTITY -->
+    <div id="layer-name" class="layer layer-hidden">
+        <div class="glass-box p-8 space-y-8">
+            <h2 class="font-header text-center text-sm tracking-[4px]">MASUKKAN NAMA</h2>
+            <input id="name-input" type="text" maxlength="12" class="input-minimal font-mystic" placeholder="Panggil Anda...">
+            <button onclick="ascend()" class="btn-gold">Konfirmasi</button>
+        </div>
+    </div>
+
+    <!-- 4. ASCENSION OVERLAY -->
+    <div id="layer-ascension" class="layer layer-hidden z-50 bg-black/40">
+        <div class="text-center">
+            <div class="w-12 h-12 border-t-2 border-gold rounded-full animate-spin mx-auto mb-4"></div>
+            <p class="font-header text-[10px] text-gold tracking-[5px]">NAIK KE CAKRAWALA</p>
+        </div>
+    </div>
+
+    <!-- 5. MAIN HUB -->
+    <div id="layer-main" class="layer layer-hidden !p-0 !justify-start">
+        <div class="w-full p-4 flex justify-between items-center border-b border-white/10 bg-black/60 backdrop-blur-md">
+            <div>
+                <h1 class="font-header text-gold text-sm tracking-widest">ORACLE</h1>
+                <p id="user-tag" class="text-[10px] text-gray-400 font-bold uppercase"></p>
+            </div>
+            <button onclick="toggleSet()" class="text-[10px] border border-gray-700 px-2 py-1 rounded">MENU</button>
+        </div>
+
+        <div id="chat-area" class="flex-1 w-full overflow-y-auto p-4 space-y-4">
+            <div id="result-card" class="glass-box mx-auto p-6 text-center relative overflow-hidden hidden">
+                <div id="res-type" class="text-[9px] font-bold tracking-[3px] uppercase mb-2">TYPE</div>
+                <div id="res-text" class="font-mystic text-xl italic text-white mb-4">"Hasil ramalan..."</div>
+                <div id="res-author" class="text-[8px] text-gold/60 uppercase">DIBUKA OLEH: -</div>
+            </div>
+            <div id="chat-feed" class="flex flex-col gap-2 pb-20"></div>
+        </div>
+
+        <div class="w-full p-4 bg-black border-t border-white/10">
+            <div id="input-modifier" class="hidden mb-2 flex justify-between items-center bg-white/5 p-2 rounded text-[10px] border border-gold/20">
+                <div id="modifier-info" class="flex flex-col">
+                    <span id="modifier-label" class="text-gold font-bold uppercase"></span>
+                    <span id="modifier-text" class="text-gray-400 italic"></span>
+                </div>
+                <button onclick="cancelModifier()" class="text-red-500 font-bold ml-2 text-xs">X</button>
+            </div>
+            
+            <button id="fate-btn" onclick="getFate()" class="btn-gold !bg-gold/20 font-bold mb-3">BUKA TAKDIR</button>
+            
+            <div class="flex gap-2">
+                <input id="chat-msg" type="text" placeholder="Kirim pesan... (@nama)" class="flex-1 bg-transparent border-b border-white/20 text-sm py-1 outline-none focus:border-gold">
+                <button onclick="handleSend()" class="text-gold px-2">➤</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-set" class="fixed inset-0 z-[60] bg-black/95 hidden flex-col items-center justify-center p-10">
+        <h3 class="font-header text-red-500 mb-10 tracking-widest">PENGATURAN</h3>
+        <button onclick="clearData('Pesan')" class="btn-gold !border-red-900 !text-red-900 mb-4">Hapus Chat</button>
+        <button onclick="clearData('Tantangan')" class="btn-gold !border-red-900 !text-red-900 mb-8">Reset Oracle</button>
+        <button onclick="toggleSet()" class="text-xs text-gray-500">TUTUP</button>
+    </div>
+
+    <script>
+        const supa = supabase.createClient(
+            'https://rruxlxoeelxjjjmhafkc.supabase.co', 
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJydXhseG9lZWx4ampqbWhhZmtjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk3NDU5OTMsImV4cCI6MjA4NTMyMTk5M30.oR2hl_BDD1P6Dmtos2So-aJ_eoFl1-Kwybt6mQnvq0Q'
+        );
+
+        let myName = "";
+        let replyingTo = null;
+        let editingId = null;
+        
+        // --- DATA BANK TERUPDATE (30 TRUTH & 30 DARE WAJAR) ---
+        const truths = [
+            "Apa hobi tersembunyi yang jarang kamu ceritakan?",
+            "Siapa orang pertama yang kamu chat setiap pagi?",
+            "Lagu apa yang diam-diam kamu suka tapi malu mengakuinya?",
+            "Apa ketakutan terbesarmu yang terdengar sepele bagi orang lain?",
+            "Apa mimpi yang paling ingin kamu wujudkan tahun ini?",
+            "Sifat apa yang paling kamu sukai dari dirimu sendiri?",
+            "Sifat apa yang paling ingin kamu ubah dari dirimu?",
+            "Siapa orang di ruangan ini yang paling ingin kamu ajak diskusi serius?",
+            "Apa momen paling membahagiakan dalam hidupmu sejauh ini?",
+            "Apa makanan yang paling tidak kamu sukai padahal banyak orang suka?",
+            "Jika bisa kembali ke masa lalu, momen apa yang ingin kamu ubah?",
+            "Siapa sosok yang paling menginspirasimu saat ini?",
+            "Apa hal terakhir yang membuatmu tertawa sampai sakit perut?",
+            "Pernahkah kamu salah kirim chat ke grup keluarga/kerja?",
+            "Apa barang yang sangat ingin kamu beli tapi belum kesampaian?",
+            "Berapa lama waktu terlama kamu tidak mandi?",
+            "Apa tontonan masa kecil yang masih kamu ingat sampai sekarang?",
+            "Apa pelajaran sekolah yang paling sulit bagimu?",
+            "Siapa orang yang paling sering membuatmu tersenyum belakangan ini?",
+            "Apa kebiasaan unikmu sebelum tidur?",
+            "Jika bisa punya kekuatan super, kamu ingin kekuatan apa?",
+            "Apa tempat impian yang ingin kamu kunjungi bersama teman-teman?",
+            "Hal apa yang menurutmu paling romantis dalam sebuah hubungan?",
+            "Apa tantangan hidup terberat yang pernah kamu lewati?",
+            "Apa pencapaian yang paling kamu banggakan tahun lalu?",
+            "Pernahkah kamu diam-diam menangis saat nonton film sedih?",
+            "Apa nama panggilan unikmu saat masih kecil?",
+            "Hal apa yang bisa langsung memperbaiki suasana hatimu (mood booster)?",
+            "Apa hadiah paling berkesan yang pernah kamu terima?",
+            "Apa satu hal yang ingin kamu pelajari tapi merasa belum bisa?"
+        ];
+
+        const dares = [
+            "Tirukan suara hewan peliharaanmu saat sedang lapar.",
+            "Berikan pujian tulus kepada 3 orang di ruangan ini.",
+            "Lakukan gerakan olahraga ringan (push-up/squat) sebanyak 10 kali.",
+            "Gunakan dialek/logat daerah tertentu selama 1 menit bicara.",
+            "Ceritakan satu fakta menarik yang baru saja kamu pelajari.",
+            "Kirim pesan singkat 'Semangat ya!' ke orang ke-3 di WhatsApp-mu.",
+            "Nyanyikan sepenggal lagu favoritmu dengan suara merdu (atau lucu).",
+            "Lakukan gaya 'catwalk' menyeberangi ruangan ini.",
+            "Tunjukkan ekspresi wajah paling ceria yang bisa kamu buat.",
+            "Ceritakan satu candaan (jokes) yang menurutmu paling lucu.",
+            "Gambarkan sesuatu yang sederhana di udara, biarkan yang lain menebak.",
+            "Gunakan satu benda di sekitarmu sebagai properti akting selama 30 detik.",
+            "Tirukan gaya bicara presenter berita saat menyampaikan sesuatu.",
+            "Berikan tips kesehatan singkat kepada semua orang.",
+            "Tunjukkan satu bakat terpendammu (misal: sulap jari, lidah ditekuk).",
+            "Katakan 'Saya hebat!' dengan nada yang berbeda-beda sebanyak 5 kali.",
+            "Lakukan gerakan dance 'slow motion' selama 20 detik.",
+            "Ceritakan ringkasan film terakhir yang kamu tonton dalam 30 detik.",
+            "Tiru gaya salah satu emoji yang diminta oleh temanmu.",
+            "Berdiri di satu kaki selama 45 detik tanpa terjatuh.",
+            "Ucapkan 'Tongtet tongtet' sebanyak 10 kali dengan sangat cepat.",
+            "Coba sentuh hidungmu menggunakan lidahmu.",
+            "Gunakan buku atau benda datar di atas kepala sambil berjalan lurus.",
+            "Tirukan suara kartun favoritmu saat berbicara.",
+            "Sebutkan 10 benda berwarna kuning yang ada di pikiranmu dalam 10 detik.",
+            "Pura-pura sedang memegang mikrofon dan perkenalkan dirimu ke audiens fiktif.",
+            "Lakukan pantomim singkat tentang kegiatan mencuci baju.",
+            "Ucapkan terima kasih kepada orang di sebelah kananmu atas hal kecil.",
+            "Tunjukkan cara menyapa yang unik untuk grup ini.",
+            "Tutup mata dan tebak benda apa yang diletakkan di tanganmu."
+        ];
+
+        const wilds = [
+            "BEBAS HUKUMAN: Simpan kartu ini untuk membatalkan satu tantangan nanti.",
+            "TUKAR POSISI: Pilih satu orang untuk melakukan tantangan yang seharusnya untukmu.",
+            "DOUBLE TROUBLE: Kamu harus melakukan satu Truth DAN satu Dare sekaligus.",
+            "ORACLE REVERSE: Orang yang menyuruhmu sekarang harus melakukan tantangan darimu.",
+            "SILENT MODE: Kamu tidak boleh bicara sampai 3 putaran berikutnya (hanya bahasa isyarat)."
+        ];
+
+        function showLayer(id) {
+            document.querySelectorAll('.layer').forEach(l => l.classList.add('layer-hidden'));
+            document.getElementById(id).classList.remove('layer-hidden');
+        }
+
+        function createStars() {
+            const container = document.getElementById('universe');
+            for(let i=0; i<150; i++) {
+                const s = document.createElement('div');
+                s.className = 'star';
+                const size = Math.random() * 2 + 'px';
+                s.style.width = size; s.style.height = size;
+                s.style.top = Math.random() * 100 + '%';
+                s.style.left = Math.random() * 100 + '%';
+                container.appendChild(s);
+            }
+        }
+        createStars();
+
+        document.getElementById('sec-input').addEventListener('input', (e) => {
+            if(e.target.value === '010304') {
+                showLayer('layer-sag');
+                document.getElementById('sag-svg').classList.add('draw-anim');
+                setTimeout(() => showLayer('layer-name'), 3500);
+            }
+        });
+
+        async function ascend() {
+            const val = document.getElementById('name-input').value.trim();
+            if(!val) return;
+            myName = val;
+            document.body.classList.add('ascension-active');
+            showLayer('layer-ascension');
+            await supa.auth.signInAnonymously();
+            setTimeout(() => {
+                document.body.classList.remove('ascension-active');
+                document.getElementById('user-tag').innerText = myName;
+                showLayer('layer-main');
+                initRealtime();
+            }, 3000);
+        }
+
+        async function getFate() {
+            const btn = document.getElementById('fate-btn');
+            btn.disabled = true;
+            btn.innerText = "MEMANGGIL BINTANG...";
+            const rng = Math.random();
+            let type, content, color;
+            if(rng < 0.45) { type="TRUTH"; content=truths[Math.floor(Math.random()*truths.length)]; color="#3b82f6"; }
+            else if(rng < 0.85) { type="DARE"; content=dares[Math.floor(Math.random()*dares.length)]; color="#ef4444"; }
+            else { type="WILDCARD"; content=wilds[Math.floor(Math.random()*wilds.length)]; color="#fbbf24"; }
+            const payload = JSON.stringify({ type, content, color });
+            await supa.from('Tantangan').insert([{ isi: payload, pembuat: myName }]);
+            await supa.from('Pesan').insert([{ nama: "ORACLE", teks: JSON.stringify({ isSystem: true, type, content, target: myName, color }) }]);
+            btn.disabled = false;
+            btn.innerText = "BUKA TAKDIR";
+        }
+
+        function renderOracle(data) {
+            const card = document.getElementById('result-card');
+            const p = JSON.parse(data.isi);
+            card.classList.remove('hidden');
+            card.style.borderColor = p.color;
+            document.getElementById('res-type').innerText = p.type;
+            document.getElementById('res-type').style.color = p.color;
+            document.getElementById('res-text').innerText = `"${p.content}"`;
+            document.getElementById('res-author').innerText = `DIBUKA OLEH: ${data.pembuat}`;
+        }
+
+        function formatMessage(text) {
+            const mentionRegex = /@(\w+)/g;
+            return text.replace(mentionRegex, (match, p1) => {
+                return `<span class="mention">${match}</span>`;
+            });
+        }
+
+        function renderChat(msg) {
+            const feed = document.getElementById('chat-feed');
+            const exist = document.getElementById(`m-${msg.id}`);
+            
+            if(exist) {
+                const contentDiv = exist.querySelector('.content-text');
+                if (contentDiv) contentDiv.innerHTML = formatMessage(msg.teks);
+                return;
+            }
+
+            const div = document.createElement('div');
+            div.id = `m-${msg.id}`;
+            div.className = "message-bubble";
+
+            if(msg.nama === "ORACLE") {
+                const s = JSON.parse(msg.teks);
+                div.className = "sys-bubble";
+                div.style.borderLeftColor = s.color;
+                div.innerHTML = `<span style="color:${s.color}" class="text-[10px] font-bold">${s.type} untuk ${s.target}</span><br>${s.content}`;
+            } else {
+                const isMe = msg.nama === myName;
+                const isMentioned = msg.teks.includes(`@${myName}`);
+                
+                div.className = `max-w-[85%] p-2 rounded text-sm mb-1 ${isMe ? 'bg-gold/10 ml-auto border-r-2 border-gold text-right' : 'bg-white/5 mr-auto border-l-2 border-gray-500'} ${isMentioned ? 'is-tagged' : ''}`;
+                
+                let replyHtml = "";
+                if(msg.reply_to) {
+                    const author = msg.reply_to_author || "Seseorang";
+                    replyHtml = `<div class="reply-preview opacity-60 mb-1">Reply to ${author}: ${msg.reply_to_text.substring(0, 30)}...</div>`;
+                }
+
+                div.innerHTML = `
+                    <div class="flex justify-between items-center text-[8px] opacity-50 uppercase mb-1">
+                        <span>${msg.nama}</span>
+                        ${isMe ? `<span onclick="event.stopPropagation(); startEdit(${msg.id}, '${msg.teks}')" class="ml-2 text-gold cursor-pointer">EDIT</span>` : ''}
+                    </div>
+                    ${replyHtml}
+                    <div class="content-text" onclick="startReply(${msg.id}, '${msg.nama}', '${msg.teks}')">${formatMessage(msg.teks)}</div>
+                `;
+            }
+
+            feed.appendChild(div);
+            const area = document.getElementById('chat-area');
+            area.scrollTop = area.scrollHeight;
+        }
+
+        function startReply(id, author, text) {
+            editingId = null;
+            replyingTo = { id, author, text };
+            document.getElementById('input-modifier').classList.remove('hidden');
+            document.getElementById('modifier-label').innerText = "REPLY TO " + author;
+            document.getElementById('modifier-text').innerText = text.substring(0, 25) + "...";
+            
+            if(author !== myName) {
+                const msgInput = document.getElementById('chat-msg');
+                if(!msgInput.value.includes(`@${author}`)) {
+                    msgInput.value = `@${author} ` + msgInput.value;
+                }
+            }
+            document.getElementById('chat-msg').focus();
+        }
+
+        function startEdit(id, text) {
+            replyingTo = null;
+            editingId = id;
+            document.getElementById('input-modifier').classList.remove('hidden');
+            document.getElementById('modifier-label').innerText = "EDITING PESAN";
+            document.getElementById('modifier-text').innerText = text.substring(0, 25) + "...";
+            document.getElementById('chat-msg').value = text;
+            document.getElementById('chat-msg').focus();
+        }
+
+        function cancelModifier() {
+            replyingTo = null;
+            editingId = null;
+            document.getElementById('input-modifier').classList.add('hidden');
+            document.getElementById('chat-msg').value = "";
+        }
+
+        async function handleSend() {
+            const inp = document.getElementById('chat-msg');
+            const text = inp.value.trim();
+            if(!text) return;
+
+            if(editingId) {
+                await supa.from('Pesan').update({ teks: text }).eq('id', editingId);
+            } else {
+                const payload = { 
+                    nama: myName, 
+                    teks: text,
+                    reply_to: replyingTo ? replyingTo.id : null,
+                    reply_to_text: replyingTo ? replyingTo.text : null,
+                    reply_to_author: replyingTo ? replyingTo.author : null
+                };
+                await supa.from('Pesan').insert([payload]);
+            }
+            
+            cancelModifier();
+            inp.value = "";
+        }
+
+        function initRealtime() {
+            supa.from('Pesan').select('*').order('id', {ascending:true}).limit(30).then(r => r.data?.forEach(renderChat));
+            supa.from('Tantangan').select('*').order('id', {descending:true}).limit(1).then(r => { if(r.data?.[0]) renderOracle(r.data[0]); });
+
+            supa.channel('oracle_ultimate_v3')
+                .on('postgres_changes', {event:'INSERT', schema:'public', table:'Pesan'}, p => renderChat(p.new))
+                .on('postgres_changes', {event:'UPDATE', schema:'public', table:'Pesan'}, p => renderChat(p.new))
+                .on('postgres_changes', {event:'INSERT', schema:'public', table:'Tantangan'}, p => renderOracle(p.new))
+                .on('postgres_changes', {event:'DELETE', schema:'public', table:'Pesan'}, () => document.getElementById('chat-feed').innerHTML="")
+                .on('postgres_changes', {event:'DELETE', schema:'public', table:'Tantangan'}, () => document.getElementById('result-card').classList.add('hidden'))
+                .subscribe();
+        }
+
+        function toggleSet() {
+            document.getElementById('modal-set').classList.toggle('hidden');
+            document.getElementById('modal-set').classList.toggle('flex');
+        }
+
+        async function clearData(table) {
+            if(!confirm("Hapus data?")) return;
+            await supa.from(table).delete().gt('id', 0);
+            toggleSet();
+        }
+    </script>
+</body>
+</html>
+
