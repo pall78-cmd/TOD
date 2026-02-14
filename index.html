@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Oracle v15.7 - Wildcard Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=Cormorant+Garamond:ital,wght@0,500;1,500&family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
+    
+    <style>
+        :root { --gold: #D4AF37; --void: #020205; --wild: #a855f7; }
+        body { background-color: var(--void); color: #f0f0f0; font-family: 'Montserrat', sans-serif; height: 100dvh; width: 100vw; overflow: hidden; margin: 0; position: fixed; }
+        .font-header { font-family: 'Cinzel', serif; }
+        .font-mystic { font-family: 'Cormorant Garamond', serif; }
+
+        #universe { position: fixed; inset: 0; z-index: 0; background: radial-gradient(circle at center, #1a0b2e 0%, #000 100%); pointer-events: none; }
+        .star { position: absolute; background: white; border-radius: 50%; opacity: 0.5; }
+        
+        .layer { position: absolute; inset: 0; z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; transition: all 0.8s ease; background: var(--void); }
+        .layer-hidden { opacity: 0 !important; pointer-events: none !important; visibility: hidden !important; transform: scale(1.05); }
+
+        #chat-area { position: relative; flex: 1; width: 100%; overflow-y: auto; padding: 15px; z-index: 10; scroll-behavior: smooth; -webkit-overflow-scrolling: touch; }
+        .chat-item { position: relative; width: 100%; margin-bottom: 12px; }
+        .bubble { padding: 12px 16px; border-radius: 18px; font-size: 14px; position: relative; max-width: 85%; z-index: 20; transition: transform 0.2s ease; touch-action: pan-y; }
+        .bubble-me { background: rgba(212, 175, 55, 0.12); border: 1px solid rgba(212, 175, 55, 0.4); border-bottom-right-radius: 2px; }
+        .bubble-other { background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-bottom-left-radius: 2px; }
+
+        .vn-btn { width: 44px; height: 44px; border-radius: 50%; border: 1px solid #333; display: flex; align-items: center; justify-content: center; background: transparent; }
+        .vn-recording { background: #ef4444 !important; border-color: #ef4444 !important; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); } 70% { transform: scale(1.1); box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); } 100% { transform: scale(1); } }
+        
+        .vo-indicator { width: 44px; height: 44px; border: 2px solid #333; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #555; font-family: 'Cinzel'; cursor: pointer; transition: all 0.3s ease; }
+        .vo-indicator.active { border-color: #ef4444; color: #ef4444; box-shadow: 0 0 15px rgba(239, 68, 68, 0.3); background: rgba(239, 68, 68, 0.1); }
+
+        #nav-menu, #context-menu, #vo-viewer { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; background: rgba(0,0,0,0.92); z-index: 5000; opacity: 0; transition: opacity 0.3s ease; }
+        .menu-card, .context-box { width: 280px; background: #080808; border: 1px solid var(--gold); border-radius: 24px; overflow: hidden; }
+        .menu-item, .ctx-item { padding: 20px; text-align: center; font-size: 11px; letter-spacing: 2px; border-bottom: 1px solid #111; color: #aaa; font-family: 'Cinzel'; cursor: pointer; }
+
+        #vo-viewer { background: #000; z-index: 9999; }
+        #vo-viewer img { max-width: 100%; max-height: 80vh; object-fit: contain; }
+
+        .sag-path { fill: none; stroke: var(--gold); stroke-width: 1.5; stroke-dasharray: 1000; stroke-dashoffset: 1000; }
+        .draw-anim { animation: drawPath 3.5s forwards; }
+        @keyframes drawPath { to { stroke-dashoffset: 0; } }
+
+        audio { height: 35px; width: 180px; filter: invert(1) hue-rotate(180deg) brightness(1.5); }
+        .uploading-pulse { animation: pulseGold 1s infinite; opacity: 0.5; pointer-events: none; }
+        @keyframes pulseGold { 0% { color: var(--gold); } 50% { color: white; } 100% { color: var(--gold); } }
+
+        .wildcard-glow { animation: wildcardGlow 2s infinite alternate; }
+        @keyframes wildcardGlow { from { box-shadow: 0 0 5px var(--wild); } to { box-shadow: 0 0 20px var(--wild); } }
+    </style>
+</head>
+<body>
+
+    <div id="universe"></div>
+
+    <!-- SECURITY -->
+    <div id="layer-sec" class="layer">
+        <div class="text-center space-y-10 w-full max-w-[280px]">
+            <h1 class="font-header text-2xl tracking-[10px] text-gold">SANCTUM</h1>
+            <input id="sec-input" type="password" maxlength="6" class="bg-transparent border-b border-gold/40 text-center w-full py-4 outline-none tracking-[15px] text-gold text-2xl" placeholder="••••••">
+            <p class="text-[9px] text-gray-700 tracking-[3px] font-bold uppercase">PIN: 010304</p>
+        </div>
+    </div>
+
+    <!-- SAGITTARIUS -->
+    <div id="layer-sag" class="layer layer-hidden" style="background: transparent;">
+        <svg class="w-64 h-64" viewBox="0 0 200 200">
+            <path id="sag-svg" class="sag-path" d="M160,40 L130,70 L130,130 L70,130 L40,160 M130,70 L40,70 L20,90" />
+            <circle cx="160" cy="40" r="3" fill="var(--gold)" />
+            <circle cx="40" cy="160" r="3" fill="var(--gold)" />
+        </svg>
+        <p class="font-header text-gold text-[10px] tracking-[10px] mt-8">SAGITTARIUS</p>
+    </div>
+
+    <!-- IDENTITY -->
+    <div id="layer-name" class="layer layer-hidden">
+        <div class="w-full max-w-[300px] space-y-8">
+            <h2 class="font-header text-center text-gold tracking-[4px] text-xs uppercase">IDENTITAS</h2>
+            <input id="name-input" type="text" maxlength="12" class="bg-transparent border-b border-gold/40 text-center w-full py-2 outline-none font-mystic text-2xl text-white" placeholder="...">
+            <button onclick="ascend()" class="w-full border border-gold text-gold p-4 font-header text-[10px] tracking-[4px]">MASUK</button>
+        </div>
+    </div>
+
+    <!-- MAIN HUB -->
+    <div id="layer-main" class="layer layer-hidden !p-0 !justify-start bg-transparent">
+        <div class="w-full p-4 flex justify-between items-center border-b border-white/5 bg-black/95 z-[600]">
+            <div class="font-header text-gold text-[10px] tracking-[5px]">ORACLE v15.7</div>
+            <button onclick="toggleNav(true)" class="text-gold border border-gold/30 px-5 py-2 rounded-full font-header text-[8px] tracking-[2px]">MENU</button>
+        </div>
+
+        <div id="chat-area">
+            <div id="chat-feed" class="flex flex-col gap-4 pb-48 pt-4"></div>
+        </div>
+
+        <!-- INPUT BAR -->
+        <div class="w-full bg-black/95 border-t border-white/10 z-[500] p-4 safe-bottom">
+            <div id="reply-preview" class="hidden px-4 py-2 bg-white/5 mb-2 border-l-2 border-gold text-[10px]">
+                <div class="flex justify-between text-gold italic">
+                    <span id="reply-content">Membalas...</span>
+                    <button onclick="clearReply()">✕</button>
+                </div>
+            </div>
+
+            <div class="p-2 mb-4">
+                <button onclick="getFate()" class="w-full border border-gold/40 text-gold/80 p-2 font-header text-[9px] tracking-[2px] bg-gold/5 uppercase">Bangkitkan Takdir</button>
+            </div>
+
+            <div class="flex gap-3 items-center">
+                <div id="vo-toggle" onclick="toggleVO()" class="vo-indicator">1</div>
+                <input type="file" id="img-input" class="hidden" accept="image/*">
+                <button id="img-btn" onclick="document.getElementById('img-input').click()" class="text-gold/60">
+                    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                </button>
+                <button id="mic-btn" class="vn-btn text-gold/60"><svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></button>
+                <input id="chat-msg" type="text" placeholder="Ketik pesan..." class="flex-1 bg-transparent border-b border-white/10 text-sm py-2 outline-none text-white focus:border-gold">
+                <button onclick="send()" id="send-btn" class="text-gold text-lg">➤</button>
+            </div>
+            <p id="record-status" class="text-[8px] text-center mt-2 text-red-500 font-bold uppercase hidden animate-pulse">Recording...</p>
+        </div>
+    </div>
+
+    <!-- VIEW ONCE OVERLAY -->
+    <div id="vo-viewer">
+        <div class="absolute top-8 right-8 z-[10001]">
+            <p class="text-red-500 font-header text-xl animate-pulse">ONCE VIEW</p>
+        </div>
+        <img id="vo-img-target" src="">
+        <button onclick="closeVO()" class="absolute bottom-10 border border-red-500 text-red-500 px-8 py-3 font-header rounded-full">TUTUP & HANCURKAN</button>
+    </div>
+
+    <!-- MENU OVERLAY -->
+    <div id="nav-menu" onclick="toggleNav(false)">
+        <div class="menu-card" onclick="event.stopPropagation()">
+            <div onclick="clearDBChat()" class="menu-item !text-red-500 font-bold">HAPUS SEMUA CHAT</div>
+            <div onclick="resetLocal()" class="menu-item">HAPUS RIWAYAT BERMAIN</div>
+            <div onclick="toggleNav(false)" class="menu-item !border-none text-gray-600">BATAL</div>
+        </div>
+    </div>
+
+    <!-- CONTEXT MENU -->
+    <div id="context-menu" onclick="closeContext()">
+        <div class="context-box" onclick="event.stopPropagation()">
+            <div id="ctx-edit" class="ctx-item">EDIT PESAN</div>
+            <div id="ctx-delete" class="ctx-item !text-red-600 font-bold">HANCURKAN</div>
+            <div onclick="closeContext()" class="ctx-item !border-none text-gray-500">BATAL</div>
+        </div>
+    </div>
+
+    <script>
+        const supa = supabase.createClient(
+            'https://rruxlxoeelxjjjmhafkc.supabase.co', 
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJydXhseG9lZWx4ampqbWhhZmtjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk3NDU5OTMsImV4cCI6MjA4NTMyMTk5M30.oR2hl_BDD1P6Dmtos2So-aJ_eoFl1-Kwybt6mQnvq0Q'
+        );
+
+        let myName = "", isVO = false, replyTo = null, editId = null;
+        let mediaRecorder, audioChunks = [], holdTimer;
+        let currentVoData = null;
+        let fateHistory = { truth: 0, dare: 0 };
+
+        const TRUTHS = [
+            "Apa hal yang paling kamu sesali?", "Siapa orang terakhir yang kamu stalk?", "Rahasia yang belum pernah kamu ceritakan?",
+            "Apa ketakutan terbesarmu dalam hubungan?", "Pernahkah kamu berbohong demi kebaikan?", "Siapa orang yang diam-diam kamu benci?",
+            "Apa memori masa kecil yang paling memalukan?", "Sebutkan satu kebiasaan buruk yang ingin kamu ubah.", "Siapa orang yang paling ingin kamu minta maaf?",
+            "Apa fantasi terliarmu yang belum tercapai?", "Pernahkah kamu pura-pura sakit demi sesuatu?", "Apa hal paling gila yang pernah kamu lakukan demi cinta?",
+            "Jika kamu bisa bertukar hidup dengan seseorang, siapa itu?", "Apa kesan pertamamu tentang orang di chat ini?", "Pernahkah kamu dikhianati oleh teman baik?",
+            "Apa pencapaian yang paling kamu banggakan tapi jarang diketahui?", "Siapa mantan yang paling susah kamu lupakan?", "Apa hal yang membuatmu merasa paling tidak aman?",
+            "Pernahkah kamu menangis karena hal sepele?", "Kapan terakhir kali kamu merasa sangat iri?", "Apa hal yang paling kamu sukai dari dirimu sendiri?",
+            "Siapa orang yang paling berpengaruh dalam hidupmu?", "Apa kesalahan terbesar yang pernah kamu buat di sekolah/kerja?",
+            "Sebutkan satu barang yang kamu simpan tapi seharusnya dibuang.", "Pernahkah kamu selingkuh atau diselingkuhi?", "Apa kebohongan terbesar yang pernah kamu katakan ke orang tua?",
+            "Siapa orang di chat ini yang menurutmu paling menarik?", "Apa ketakutan teraneh yang kamu miliki?"
+        ];
+
+        const DARES = [
+            "VN suara bayi selama 10 detik", "Kirim foto random dari galerimu", "Chat orang random bilang 'Kangen'",
+            "Kirim screenshot riwayat pencarian browsermu", "Beraktinglah seperti kucing selama 1 menit (via VN)", "Ganti nama profilmu menjadi 'Budak Cinta' selama 1 jam",
+            "Kirim pesan suara menyanyikan lagu galau paling keras", "Tulis status di sosmed: 'Aku cinta kamu' tanpa konteks", "Minta izin ortu/pacar untuk menikah besok (kirim SS)",
+            "Pesan makanan paling murah lewat ojol dan kirim ke orang asing", "Kirim selfie dengan wajah paling konyol sekarang", "Bacakan chat terakhirmu dengan nada puitis (via VN)",
+            "Lakukan 20 push-up dan kirim suara napasmu", "Tirukan suara tokoh kartun pilihan lawan main", "Ceritakan lelucon garing sampai ada yang tertawa",
+            "Sebutkan 3 kekurangan orang yang kamu sukai di chat ini", "Kirim pesan ke mantan: 'Lagi apa?' (kirim SS)", "Tunjukkan sisa saldo rekeningmu saat ini",
+            "Minum satu sendok kecap atau saus sambal", "Hapus foto profilmu selama 12 jam ke depan", "Berikan pujian paling lebay ke 3 orang berbeda di chat",
+            "Ucapkan 'Sayang' di akhir setiap kalimatmu selama 10 menit", "Kirim rekaman layar galerimu selama 5 detik tercepat",
+            "Peluk tiang listrik terdekat dan foto.", "Kirim pesan ke dosen/atasan bilang 'I love you' lalu langsung unsend.", "Makan cabe rawit satu biji tanpa minum selama 1 menit.",
+            "Tiru gaya bicara satu orang di chat ini sampai giliranmu selesai.", "Kirim VN nangis bombay selama 15 detik."
+        ];
+
+        const WILDCARDS = [
+            "TUKAR POSISI: Kamu bebas memberikan Dare kepada siapapun di chat ini!",
+            "KEBAL: Kamu bebas dari tantangan apapun selama 3 putaran ke depan.",
+            "PEMBALASAN: Orang terakhir yang memberikan tantangan harus melakukan Dare pilihanmu.",
+            "DOUBLE TROUBLE: Kamu harus melakukan 1 Truth DAN 1 Dare sekaligus.",
+            "HAPUS JEJAK: Pilih satu chat memalukanmu dan Oracle akan menghapusnya dari database.",
+            "MIMIC: Kamu harus meniru gaya mengetik orang di sebelahmu selama 15 menit."
+        ];
+
+        document.getElementById('sec-input').addEventListener('input', (e) => {
+            if(e.target.value === '010304') {
+                document.getElementById('layer-sec').classList.add('layer-hidden');
+                const sag = document.getElementById('layer-sag');
+                sag.classList.remove('layer-hidden');
+                document.getElementById('sag-svg').classList.add('draw-anim');
+                setTimeout(() => {
+                    sag.classList.add('layer-hidden');
+                    document.getElementById('layer-name').classList.remove('layer-hidden');
+                }, 4000);
+            }
+        });
+
+        async function requestNotify() {
+            if ("Notification" in window) await Notification.requestPermission();
+        }
+
+        async function ascend() {
+            myName = document.getElementById('name-input').value.trim();
+            if(!myName) return;
+            await requestNotify();
+            document.getElementById('layer-name').classList.add('layer-hidden');
+            await supa.auth.signInAnonymously();
+            document.getElementById('layer-main').classList.remove('layer-hidden');
+            init();
+        }
+
+        function toggleNav(show) {
+            const m = document.getElementById('nav-menu');
+            if(show) { m.style.display = 'flex'; setTimeout(() => m.style.opacity = 1, 10); }
+            else { m.style.opacity = 0; setTimeout(() => m.style.display = 'none', 300); }
+        }
+
+        async function clearDBChat() { if(confirm("Bersihkan database?")) { await supa.from('Pesan').delete().gt('id',0); toggleNav(false); } }
+        function resetLocal() { if(confirm("Reset riwayat & logout?")) { localStorage.clear(); location.reload(); } }
+
+        const imgInput = document.getElementById('img-input');
+        imgInput.addEventListener('change', async (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+            const imgBtn = document.getElementById('img-btn');
+            const originalIcon = imgBtn.innerHTML;
+            try {
+                imgBtn.innerHTML = "⏳"; imgBtn.classList.add('uploading-pulse');
+                const fileExt = file.name.split('.').pop();
+                const fileName = `img_${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+                const { data, error } = await supa.storage.from('bukti').upload(fileName, file);
+                if (error) throw error;
+                const { data: urlData } = supa.storage.from('bukti').getPublicUrl(fileName);
+                const prefix = isVO ? "[VO_IMG]" : "[IMG]";
+                const msgText = `${prefix}${urlData.publicUrl}|${fileName}`;
+                await supa.from('Pesan').insert([{ nama: myName, teks: msgText }]);
+                if(isVO) toggleVO();
+            } catch (error) { console.error(error); } finally {
+                imgBtn.innerHTML = originalIcon; imgBtn.classList.remove('uploading-pulse'); imgInput.value = ''; 
+            }
+        });
+
+        const micBtn = document.getElementById('mic-btn');
+        micBtn.addEventListener('mousedown', startRec);
+        micBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startRec(); });
+        window.addEventListener('mouseup', stopRec);
+        window.addEventListener('touchend', stopRec);
+
+        async function startRec() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+                mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+                mediaRecorder.onstop = uploadVN;
+                mediaRecorder.start();
+                micBtn.classList.add('vn-recording');
+                document.getElementById('record-status').classList.remove('hidden');
+            } catch(e) { console.error(e); }
+        }
+        function stopRec() {
+            if(mediaRecorder?.state === "recording") {
+                mediaRecorder.stop();
+                micBtn.classList.remove('vn-recording');
+                document.getElementById('record-status').classList.add('hidden');
+            }
+        }
+        async function uploadVN() {
+            const blob = new Blob(audioChunks, { type: 'audio/webm' });
+            const fn = `vn_${Date.now()}.webm`;
+            await supa.storage.from('bukti').upload(fn, blob);
+            const { data } = supa.storage.from('bukti').getPublicUrl(fn);
+            const prefix = isVO ? "[VO_VN]" : "[VN]";
+            await supa.from('Pesan').insert([{ nama: myName, teks: `${prefix}${data.publicUrl}|${fn}` }]);
+            if(isVO) toggleVO();
+        }
+
+        function renderChat(msg) {
+            if(document.getElementById(`m-${msg.id}`)) return;
+            const feed = document.getElementById('chat-feed');
+            const isMe = msg.nama === myName;
+            const wrap = document.createElement('div');
+            wrap.id = `m-${msg.id}`;
+            wrap.className = "chat-item";
+
+            let clean = msg.teks;
+            let replyHtml = "";
+
+            if(msg.nama === "ORACLE") {
+                try {
+                    const d = JSON.parse(clean);
+                    const isWild = d.type === "WILDCARD";
+                    wrap.innerHTML = `<div class="mx-6 p-4 border border-dashed rounded-2xl text-center ${isWild ? 'wildcard-glow bg-purple-900/10' : 'bg-gold/5'}" style="border-color:${d.color}">
+                        <p class="text-[8px] font-header tracking-widest mb-1 uppercase" style="color:${d.color}">${d.type} » ${d.target}</p>
+                        <p class="font-mystic text-lg italic text-white leading-tight">"${d.content}"</p>
+                    </div>`;
+                    feed.appendChild(wrap);
+                    feed.scrollTop = feed.scrollHeight;
+                    return;
+                } catch(e) {}
+            }
+
+            if(clean.startsWith(">>REPLY|")) {
+                const p = clean.split(">>");
+                const m = p[1].split("|");
+                replyHtml = `<div class="text-[9px] text-gold/40 mb-1 border-l-2 border-gold/20 pl-2 italic">@${m[1]}: ${m[2]}</div>`;
+                clean = p[2];
+                if (m[1] === myName && !isMe && document.visibilityState !== "visible") {
+                    if (Notification.permission === "granted") {
+                        new Notification("Oracle v15.7", { body: `${msg.nama} menandai Anda: "${clean}"` });
+                    }
+                }
+            }
+
+            let content = "";
+            if(clean.startsWith("[VN]") || clean.startsWith("[VO_VN]")) {
+                const isVOVN = clean.startsWith("[VO_VN]");
+                const [url, fn] = clean.replace(isVOVN ? "[VO_VN]" : "[VN]", "").split("|");
+                if(isVOVN && !isMe) {
+                    content = `<div class="p-3 border border-red-500/30 bg-red-500/5 rounded-xl text-center cursor-pointer" onclick="playVOVN('${url}','${fn}',${msg.id})"><span class="text-[8px] text-red-500 font-bold animate-pulse uppercase tracking-widest">AUDIO RAHASIA (1x)</span></div>`;
+                } else {
+                    content = `<div><audio controls src="${url}"></audio></div>`;
+                }
+            } else if(clean.startsWith("[IMG]") || clean.startsWith("[VO_IMG]")) {
+                const isVOIMG = clean.startsWith("[VO_IMG]");
+                const [url, fn] = clean.replace(isVOIMG ? "[VO_IMG]" : "[IMG]", "").split("|");
+                if(isVOIMG && !isMe) {
+                    content = `<div class="p-4 border border-red-500/30 bg-red-500/5 rounded-xl text-center cursor-pointer" onclick="openVOImage('${url}','${fn}',${msg.id})"><div class="text-2xl mb-2">🔥</div><span class="text-[9px] text-red-500 font-bold animate-pulse uppercase tracking-widest">FOTO RAHASIA (1x)</span></div>`;
+                } else {
+                    const style = isVOIMG ? "border-2 border-red-500 opacity-80" : "border border-white/10";
+                    content = `<img src="${url}" class="rounded-lg max-w-[200px] ${style}" loading="lazy">`;
+                }
+            } else {
+                content = `<div class="break-words">${clean}</div>`;
+            }
+
+            wrap.innerHTML = `
+                <div class="flex flex-col ${isMe ? 'items-end' : 'items-start'} px-4">
+                    <span class="text-[8px] text-gray-600 font-bold mb-1 uppercase tracking-widest">${msg.nama}</span>
+                    <div class="bubble ${isMe ? 'bubble-me' : 'bubble-other'}">${replyHtml}${content}</div>
+                </div>`;
+            
+            feed.appendChild(wrap);
+            attachGestures(wrap.querySelector('.bubble'), msg, clean);
+            feed.scrollTop = feed.scrollHeight;
+        }
+
+        async function playVOVN(url, fn, id) {
+            const a = new Audio(url); a.play();
+            a.onended = async () => {
+                await supa.storage.from('bukti').remove([fn]);
+                await supa.from('Pesan').delete().eq('id', id);
+            };
+        }
+
+        function openVOImage(url, fn, id) {
+            const viewer = document.getElementById('vo-viewer');
+            const target = document.getElementById('vo-img-target');
+            currentVoData = { fn, id };
+            target.src = url;
+            viewer.style.display = 'flex';
+            setTimeout(() => viewer.style.opacity = 1, 10);
+        }
+
+        async function closeVO() {
+            const viewer = document.getElementById('vo-viewer');
+            viewer.style.opacity = 0;
+            setTimeout(() => { viewer.style.display = 'none'; document.getElementById('vo-img-target').src = ""; }, 300);
+            if(currentVoData) {
+                await supa.storage.from('bukti').remove([currentVoData.fn]);
+                await supa.from('Pesan').delete().eq('id', currentVoData.id);
+                currentVoData = null;
+            }
+        }
+
+        function attachGestures(el, msg, cleanText) {
+            let startX, currentX;
+            el.addEventListener('touchstart', (e) => {
+                startX = e.touches[0].clientX;
+                if(msg.nama === myName) holdTimer = setTimeout(() => showContext(msg, cleanText), 700);
+            }, {passive: true});
+            el.addEventListener('touchmove', (e) => {
+                currentX = e.touches[0].clientX;
+                const diff = currentX - startX;
+                if (diff > 15) { clearTimeout(holdTimer); el.style.transform = `translateX(${Math.min(diff, 60)}px)`; }
+            }, {passive: true});
+            el.addEventListener('touchend', () => {
+                clearTimeout(holdTimer);
+                const diff = (currentX || startX) - startX;
+                if (diff > 50) setReply(msg.nama, cleanText);
+                el.style.transform = 'translateX(0)';
+                currentX = null;
+            });
+        }
+
+        function showContext(msg, clean) {
+            const ctx = document.getElementById('context-menu');
+            ctx.style.display='flex'; setTimeout(()=>ctx.style.opacity=1, 10);
+            document.getElementById('ctx-edit').onclick = () => { editId = msg.id; document.getElementById('chat-msg').value = clean; document.getElementById('send-btn').innerText = "✓"; closeContext(); };
+            document.getElementById('ctx-delete').onclick = async () => { 
+                if(clean.includes("|")) { const fn = clean.split("|")[1]; await supa.storage.from('bukti').remove([fn]); }
+                await supa.from('Pesan').delete().eq('id', msg.id); 
+                closeContext(); 
+            };
+        }
+
+        function closeContext() { const ctx = document.getElementById('context-menu'); ctx.style.opacity=0; setTimeout(()=>ctx.style.display='none', 300); }
+
+        async function send() {
+            const inp = document.getElementById('chat-msg');
+            const val = inp.value.trim();
+            if(!val) return;
+            if(editId) {
+                await supa.from('Pesan').update({ teks: val }).eq('id', editId);
+                clearEdit();
+            } else {
+                let t = val;
+                if(replyTo) { t = `>>REPLY|${replyTo.sender}|${replyTo.text.substring(0,15)}>>${val}`; clearReply(); }
+                await supa.from('Pesan').insert([{ nama: myName, teks: t }]);
+            }
+            inp.value = "";
+        }
+
+        async function getFate() {
+            // Wildcard Logic (10% Chance)
+            const isWildcard = Math.random() < 0.1;
+            
+            if (isWildcard) {
+                const content = WILDCARDS[Math.floor(Math.random() * WILDCARDS.length)];
+                const p = JSON.stringify({ type: "WILDCARD", content: content, color: "#a855f7", target: myName });
+                await supa.from('Pesan').insert([{ nama: "ORACLE", teks: p }]);
+                return;
+            }
+
+            // Game Theory Logic
+            let probability = 0.5;
+            if (fateHistory.truth > fateHistory.dare + 2) probability = 0.8;
+            if (fateHistory.dare > fateHistory.truth + 2) probability = 0.2;
+
+            const isDare = Math.random() < probability;
+            const type = isDare ? "DARE" : "TRUTH";
+            const pool = isDare ? DARES : TRUTHS;
+            
+            if (isDare) fateHistory.dare++; else fateHistory.truth++;
+
+            const content = pool[Math.floor(Math.random() * pool.length)];
+            const p = JSON.stringify({ type: type, content: content, color: type === "TRUTH" ? "#3b82f6" : "#ef4444", target: myName });
+            await supa.from('Pesan').insert([{ nama: "ORACLE", teks: p }]);
+        }
+
+        function toggleVO() { isVO = !isVO; document.getElementById('vo-toggle').classList.toggle('active', isVO); }
+        function setReply(s, t) { replyTo={sender:s, text:t}; document.getElementById('reply-content').innerText=`@${s}: ${t}`; document.getElementById('reply-preview').classList.remove('hidden'); }
+        function clearReply() { replyTo=null; document.getElementById('reply-preview').classList.add('hidden'); }
+        function clearEdit() { editId=null; document.getElementById('send-btn').innerText="➤"; }
+
+        function init() {
+            supa.from('Pesan').select('*').order('id').limit(50).then(r => r.data?.forEach(renderChat));
+            supa.channel('v15_7').on('postgres_changes', {event:'*', schema:'public', table:'Pesan'}, p => {
+                if(p.eventType === 'INSERT') renderChat(p.new);
+                if(p.eventType === 'DELETE') document.getElementById(`m-${p.old.id}`)?.remove();
+                if(p.eventType === 'UPDATE') { document.getElementById(`m-${p.new.id}`)?.remove(); renderChat(p.new); }
+            }).subscribe();
+        }
+
+        const uv = document.getElementById('universe');
+        for(let i=0; i<60; i++) {
+            const s = document.createElement('div');
+            s.className = 'star';
+            s.style.width = s.style.height = Math.random()*2+'px';
+            s.style.top = Math.random()*100+'%'; s.style.left = Math.random()*100+'%';
+            uv.appendChild(s);
+        }
+    </script>
+</body>
+</html>
+
