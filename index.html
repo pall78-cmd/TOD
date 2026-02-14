@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Oracle v16.1 - Smart Notifications</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=Cormorant+Garamond:ital,wght@0,500;1,500&family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
+    
+    <style>
+        :root { --gold: #D4AF37; --void: #020205; --wild: #a855f7; --temp: #ef4444; }
+        body { background-color: var(--void); color: #f0f0f0; font-family: 'Montserrat', sans-serif; height: 100dvh; width: 100vw; overflow: hidden; margin: 0; position: fixed; }
+        .font-header { font-family: 'Cinzel', serif; }
+        .font-mystic { font-family: 'Cormorant Garamond', serif; }
+
+        #universe { position: fixed; inset: 0; z-index: 1; background: radial-gradient(circle at center, #1a0b2e 0%, #000 100%); pointer-events: none; }
+        .star { position: absolute; background: white; border-radius: 50%; opacity: 0.5; }
+        
+        .layer { position: absolute; inset: 0; z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; transition: all 0.8s ease; background: var(--void); }
+        .layer-hidden { opacity: 0 !important; pointer-events: none !important; visibility: hidden !important; transform: scale(1.05); }
+
+        #chat-area { position: relative; flex: 1; width: 100%; overflow-y: auto; padding: 15px; z-index: 10; scroll-behavior: smooth; -webkit-overflow-scrolling: touch; }
+        .chat-item { position: relative; width: 100%; margin-bottom: 12px; }
+        .bubble { padding: 12px 16px; border-radius: 18px; font-size: 14px; position: relative; max-width: 85%; z-index: 20; transition: transform 0.1s linear; touch-action: pan-y; }
+        .bubble-me { background: rgba(212, 175, 55, 0.12); border: 1px solid rgba(212, 175, 55, 0.4); border-bottom-right-radius: 2px; }
+        .bubble-other { background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-bottom-left-radius: 2px; }
+
+        .swipe-indicator { position: absolute; left: -40px; top: 50%; transform: translateY(-50%); opacity: 0; transition: all 0.2s; color: var(--gold); font-size: 20px; pointer-events: none; }
+
+        .temp-bubble { border: 1px solid rgba(239, 68, 68, 0.3) !important; background: rgba(239, 68, 68, 0.05) !important; }
+
+        .control-bar { width: 100%; background: #000; border-top: 1px solid rgba(255,255,255,0.1); z-index: 100; padding: 1rem; position: relative; }
+        
+        .vo-indicator { width: 44px; height: 44px; border: 2px solid #333; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #555; font-family: 'Cinzel'; cursor: pointer; transition: all 0.3s ease; }
+        .vo-indicator.active { border-color: var(--temp); color: var(--temp); box-shadow: 0 0 15px rgba(239, 68, 68, 0.3); background: rgba(239, 68, 68, 0.1); }
+
+        #nav-menu, #vo-viewer { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; background: rgba(0,0,0,0.95); z-index: 5000; opacity: 0; transition: opacity 0.3s ease; }
+        
+        #chat-feed { padding-bottom: 220px; }
+    </style>
+</head>
+<body>
+
+    <div id="universe"></div>
+
+    <!-- SECURITY LAYER -->
+    <div id="layer-sec" class="layer">
+        <div class="text-center space-y-10 w-full max-w-[280px]">
+            <h1 class="font-header text-2xl tracking-[10px] text-gold">SANCTUM</h1>
+            <input id="sec-input" type="password" maxlength="6" class="bg-transparent border-b border-gold/40 text-center w-full py-4 outline-none tracking-[15px] text-gold text-2xl" placeholder="••••••">
+            <p class="text-[9px] text-gray-700 tracking-[3px] font-bold uppercase">PIN: 010304</p>
+        </div>
+    </div>
+
+    <!-- IDENTITY LAYER -->
+    <div id="layer-name" class="layer layer-hidden">
+        <div class="w-full max-w-[300px] space-y-8">
+            <h2 class="font-header text-center text-gold tracking-[4px] text-xs uppercase">IDENTITAS</h2>
+            <input id="name-input" type="text" maxlength="12" class="bg-transparent border-b border-gold/40 text-center w-full py-2 outline-none font-mystic text-2xl text-white" placeholder="...">
+            <button onclick="ascend()" class="w-full border border-gold text-gold p-4 font-header text-[10px] tracking-[4px]">MASUK</button>
+        </div>
+    </div>
+
+    <!-- MAIN INTERFACE -->
+    <div id="layer-main" class="layer layer-hidden !p-0 !justify-start bg-transparent">
+        <div class="w-full p-4 flex justify-between items-center border-b border-white/5 bg-black/95 z-[200]">
+            <div class="font-header text-gold text-[10px] tracking-[5px]">ORACLE v16.1</div>
+            <button onclick="toggleNav(true)" class="text-gold border border-gold/30 px-5 py-2 rounded-full font-header text-[8px] tracking-[2px]">MENU</button>
+        </div>
+
+        <div id="chat-area">
+            <div id="chat-feed" class="flex flex-col gap-4"></div>
+        </div>
+
+        <div class="control-bar">
+            <div id="reply-preview" class="hidden px-4 py-2 bg-white/5 mb-2 border-l-2 border-gold text-[10px]">
+                <div class="flex justify-between text-gold italic">
+                    <span id="reply-content">Membalas...</span>
+                    <button onclick="clearReply()">✕</button>
+                </div>
+            </div>
+
+            <div class="px-2 mb-4 relative z-[110]">
+                <button id="btn-fate" onclick="getFate()" class="w-full border border-gold/40 text-gold/80 p-3 font-header text-[9px] tracking-[2px] bg-gold/5 uppercase active:scale-[0.98]">Bangkitkan Takdir</button>
+            </div>
+
+            <div class="flex gap-3 items-center relative z-[110]">
+                <div id="vo-toggle" onclick="toggleVO()" class="vo-indicator">1</div>
+                <input type="file" id="img-input" class="hidden" accept="image/*">
+                <button onclick="document.getElementById('img-input').click()" class="text-gold/60 p-2">
+                    <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                </button>
+                <button id="mic-btn" class="w-[44px] h-[44px] rounded-full border border-zinc-800 flex items-center justify-center text-gold/60"><svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></button>
+                <input id="chat-msg" type="text" placeholder="Ketik pesan..." class="flex-1 bg-transparent border-b border-white/10 text-sm py-2 outline-none text-white focus:border-gold">
+                <button onclick="send()" id="send-btn" class="text-gold text-lg px-2">➤</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- VIEW ONCE OVERLAY -->
+    <div id="vo-viewer">
+        <img id="vo-img-target" src="" class="max-w-[95vw] max-h-[75vh] object-contain">
+        <button onclick="closeVO()" class="absolute bottom-10 border border-red-500 text-red-500 px-10 py-3 font-header rounded-full">TUTUP</button>
+    </div>
+
+    <script>
+        const supa = supabase.createClient(
+            'https://rruxlxoeelxjjjmhafkc.supabase.co', 
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJydXhseG9lZWx4ampqbWhhZmtjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk3NDU5OTMsImV4cCI6MjA4NTMyMTk5M30.oR2hl_BDD1P6Dmtos2So-aJ_eoFl1-Kwybt6mQnvq0Q'
+        );
+
+        let myName = "", isVO = false, replyTo = null, isFirstLoad = true;
+
+        // --- SMART NOTIFICATION LOGIC ---
+        async function requestNotifyPermission() {
+            if ("Notification" in window) {
+                await Notification.requestPermission();
+            }
+        }
+
+        function triggerSmartNotification(msg) {
+            // Abaikan jika pesan berasal dari diri sendiri
+            if (msg.nama === myName) return;
+
+            // Abaikan jika pesan berasal dari sistem "ORACLE" (Truth/Dare)
+            if (msg.nama === "ORACLE") return;
+
+            // Logika: Hanya kirim notifikasi jika pesan teks biasa, tag, gambar, atau VN
+            if ("Notification" in window && Notification.permission === "granted") {
+                let notifyTitle = `Oracle: Pesan dari ${msg.nama}`;
+                let notifyBody = msg.teks;
+
+                // Jika pesan adalah tag/reply
+                if (msg.teks.startsWith(">>REPLY|")) {
+                    const parts = msg.teks.split(">>");
+                    const tagInfo = parts[1].split("|");
+                    const actualMsg = parts[2];
+                    
+                    // Jika saya yang di-tag
+                    if (tagInfo[1] === myName) {
+                        notifyTitle = `Oracle: ${msg.nama} men-tag Anda!`;
+                    }
+                    notifyBody = actualMsg;
+                }
+
+                // Bersihkan teks notifikasi dari tag metadata rahasia
+                if (notifyBody.includes("[VO_TEXT]")) notifyBody = "Pesan Rahasia 🔒";
+                if (notifyBody.includes("[IMG]") || notifyBody.includes("[VO_IMG]")) notifyBody = "Mengirim Gambar 🖼️";
+                if (notifyBody.includes("[VN]") || notifyBody.includes("[VO_VN]")) notifyBody = "Mengirim Pesan Suara 🎙️";
+
+                new Notification(notifyTitle, {
+                    body: notifyBody.substring(0, 60),
+                    icon: 'https://cdn-icons-png.flaticon.com/512/2592/2592317.png'
+                });
+            }
+        }
+
+        // --- SWIPE GESTURE WITH ANIMATION ---
+        function attachSwipeGesture(el, msg, cleanText) {
+            let startX = 0, currentX = 0, isSwiping = false;
+            const indicator = el.parentElement.querySelector('.swipe-indicator');
+
+            el.addEventListener('touchstart', (e) => {
+                startX = e.touches[0].clientX;
+                isSwiping = true;
+                el.style.transition = 'none';
+            }, {passive: true});
+
+            el.addEventListener('touchmove', (e) => {
+                if(!isSwiping) return;
+                currentX = e.touches[0].clientX - startX;
+                
+                if(currentX > 0) {
+                    const movement = Math.min(currentX * 0.4, 70);
+                    el.style.transform = `translateX(${movement}px)`;
+                    
+                    if(movement > 30) {
+                        indicator.style.opacity = Math.min((movement - 30) / 30, 1);
+                        indicator.style.left = `${movement - 35}px`;
+                    } else {
+                        indicator.style.opacity = 0;
+                    }
+                }
+            }, {passive: true});
+
+            el.addEventListener('touchend', () => {
+                isSwiping = false;
+                el.style.transition = 'transform 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28)';
+                
+                if(currentX > 50) {
+                    setReply(msg.nama, cleanText);
+                    if(window.navigator.vibrate) window.navigator.vibrate(15);
+                }
+                
+                el.style.transform = 'translateX(0)';
+                indicator.style.opacity = 0;
+                currentX = 0;
+            });
+        }
+
+        // --- CORE FEATURES ---
+        async function send() {
+            const inp = document.getElementById('chat-msg');
+            let val = inp.value.trim();
+            if(!val) return;
+            
+            if(replyTo) {
+                val = `>>REPLY|${replyTo.sender}|${replyTo.text.substring(0,20)}>>${val}`;
+                clearReply();
+            }
+            if(isVO) {
+                val = `[VO_TEXT]${val}|2`;
+                toggleVO();
+            }
+
+            await supa.from('Pesan').insert([{ nama: myName, teks: val }]);
+            inp.value = "";
+        }
+
+        function renderChat(msg) {
+            const feed = document.getElementById('chat-feed');
+            if(document.getElementById(`m-${msg.id}`)) return;
+
+            const isMe = msg.nama === myName;
+            const wrap = document.createElement('div');
+            wrap.id = `m-${msg.id}`;
+            wrap.className = `chat-item flex flex-col ${isMe ? 'items-end' : 'items-start'} px-4`;
+
+            let clean = msg.teks;
+            let replyHtml = "";
+
+            if(clean.startsWith(">>REPLY|")) {
+                const parts = clean.split(">>");
+                const m = parts[1].split("|");
+                replyHtml = `<div class="text-[8px] text-gold/40 mb-1 border-l border-gold/20 pl-2 italic">@${m[1]}: ${m[2]}</div>`;
+                clean = parts[2];
+            }
+
+            let body = "";
+            if(msg.nama === "ORACLE") {
+                try {
+                    const d = JSON.parse(clean);
+                    wrap.innerHTML = `<div class="mx-auto my-2 p-3 bg-white/5 border border-dashed rounded-xl text-center" style="border-color:${d.color}">
+                        <p class="text-[7px] font-header tracking-widest text-zinc-500 uppercase">${d.type}</p>
+                        <p class="font-mystic text-white italic text-sm">"${d.content}"</p>
+                    </div>`;
+                    feed.appendChild(wrap);
+                    feed.scrollTop = feed.scrollHeight;
+                    return;
+                } catch(e) {}
+            }
+
+            if(clean.startsWith("[VO_TEXT]")) {
+                const p = clean.replace("[VO_TEXT]","").split("|");
+                body = `<div class="text-red-400 text-[7px] font-bold mb-1 uppercase tracking-widest">Secret (${p[1]})</div><div>${p[0]}</div>`;
+            } else {
+                body = `<div>${clean}</div>`;
+            }
+
+            wrap.innerHTML = `
+                <span class="text-[7px] text-zinc-600 font-bold mb-1 uppercase tracking-tighter">${msg.nama}</span>
+                <div class="relative w-full flex ${isMe ? 'justify-end' : 'justify-start'}">
+                    <div class="swipe-indicator">➤</div>
+                    <div class="bubble ${isMe ? 'bubble-me' : 'bubble-other'} ${clean.startsWith('[VO_TEXT]') ? 'temp-bubble' : ''}">
+                        ${replyHtml}${body}
+                    </div>
+                </div>
+            `;
+
+            feed.appendChild(wrap);
+            attachSwipeGesture(wrap.querySelector('.bubble'), msg, clean);
+            feed.scrollTop = feed.scrollHeight;
+
+            // Trigger notifikasi hanya jika bukan load pertama (real-time)
+            if(!isFirstLoad) triggerSmartNotification(msg);
+        }
+
+        // --- SYSTEM HANDLERS ---
+        document.getElementById('sec-input').addEventListener('input', (e) => {
+            if(e.target.value === '010304') {
+                document.getElementById('layer-sec').classList.add('layer-hidden');
+                document.getElementById('layer-name').classList.remove('layer-hidden');
+            }
+        });
+
+        async function ascend() {
+            myName = document.getElementById('name-input').value.trim();
+            if(!myName) return;
+            requestNotifyPermission();
+            document.getElementById('layer-name').classList.add('layer-hidden');
+            document.getElementById('layer-main').classList.remove('layer-hidden');
+            init();
+        }
+
+        function setReply(s, t) { replyTo={sender:s, text:t}; document.getElementById('reply-content').innerText=`@${s}: ${t}`; document.getElementById('reply-preview').classList.remove('hidden'); }
+        function clearReply() { replyTo=null; document.getElementById('reply-preview').classList.add('hidden'); }
+        function toggleVO() { isVO = !isVO; document.getElementById('vo-toggle').classList.toggle('active', isVO); }
+        
+        async function init() {
+            const { data } = await supa.from('Pesan').select('*').order('id').limit(40);
+            data?.forEach(renderChat);
+            isFirstLoad = false;
+
+            supa.channel('v16_1').on('postgres_changes', {event:'INSERT', schema:'public', table:'Pesan'}, p => {
+                renderChat(p.new);
+            }).subscribe();
+        }
+
+        // Background stars
+        const uv = document.getElementById('universe');
+        for(let i=0; i<40; i++) {
+            const s = document.createElement('div');
+            s.className = 'star';
+            s.style.width = s.style.height = Math.random()*2+'px';
+            s.style.top = Math.random()*100+'%'; s.style.left = Math.random()*100+'%';
+            uv.appendChild(s);
+        }
+    </script>
+</body>
+</html>
+
