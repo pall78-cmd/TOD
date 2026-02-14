@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Oracle v16.9 - Ethical Alignment</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=Cormorant+Garamond:ital,wght@0,500;1,500&family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
+    
+    <style>
+        :root { --gold: #D4AF37; --void: #020205; --wild: #a855f7; --temp: #ef4444; }
+        body { background-color: var(--void); color: #f0f0f0; font-family: 'Montserrat', sans-serif; height: 100dvh; width: 100vw; overflow: hidden; margin: 0; position: fixed; user-select: none; -webkit-user-select: none; }
+        .font-header { font-family: 'Cinzel', serif; }
+        .font-mystic { font-family: 'Cormorant Garamond', serif; }
+
+        /* STAR SYSTEM */
+        #universe { position: fixed; inset: 0; z-index: 1; background: radial-gradient(circle at center, #1a0b2e 0%, #000 100%); pointer-events: none; transition: transform 2.5s cubic-bezier(0.7, 0, 0.3, 1); }
+        .star { position: absolute; background: white; border-radius: 50%; opacity: 0.5; }
+        .warp-active { transform: translateY(-1200px) scale(3); opacity: 0.2; }
+
+        /* SAGITTARIUS */
+        #constellation { position: fixed; inset: 0; z-index: 50; display: none; pointer-events: none; opacity: 0; transition: opacity 1.5s ease; background: rgba(0,0,0,0.85); }
+        .c-star { position: absolute; width: 6px; height: 6px; background: var(--gold); border-radius: 50%; box-shadow: 0 0 20px var(--gold); animation: twinkle 2s infinite ease-in-out; }
+        @keyframes twinkle { 0%, 100% { opacity: 0.4; transform: scale(0.9); } 50% { opacity: 1; transform: scale(1.4); } }
+
+        /* LAYERS */
+        .layer { position: absolute; inset: 0; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; transition: all 1s ease; background: var(--void); }
+        .layer-hidden { opacity: 0 !important; pointer-events: none !important; visibility: hidden !important; z-index: -1; }
+
+        /* CHAT AREA */
+        #chat-area { position: relative; flex: 1; width: 100%; overflow-y: auto; padding: 15px; z-index: 10; scroll-behavior: smooth; }
+        .bubble { padding: 12px 16px; border-radius: 18px; font-size: 14px; position: relative; max-width: 85%; z-index: 20; cursor: pointer; transition: transform 0.2s; touch-action: pan-y; }
+        .bubble-me { background: rgba(212, 175, 55, 0.08); border: 1px solid rgba(212, 175, 55, 0.25); border-bottom-right-radius: 2px; }
+        .bubble-other { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-bottom-left-radius: 2px; }
+        .tag-highlight { color: var(--gold); font-weight: bold; }
+
+        /* NOTIFICATION */
+        #notif-toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%) translateY(-120px); width: 90%; max-width: 400px; background: rgba(15, 15, 20, 0.98); border: 1px solid var(--gold); padding: 12px; border-radius: 12px; z-index: 4000; transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); backdrop-filter: blur(15px); pointer-events: none; }
+        #notif-toast.show { transform: translateX(-50%) translateY(0); }
+
+        /* MODALS */
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.92); display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: 0.3s; z-index: 5000; }
+        .modal-active { opacity: 1; pointer-events: auto; }
+
+        /* CONTROLS */
+        .control-bar { width: 100%; background: #000; border-top: 1px solid rgba(255,255,255,0.1); z-index: 200; padding: 1rem; padding-bottom: calc(1rem + env(safe-area-inset-bottom)); }
+        .vo-indicator { width: 40px; height: 40px; border: 1px solid #333; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #444; font-family: 'Cinzel'; cursor: pointer; transition: 0.3s; }
+        .vo-indicator.active { border-color: var(--temp); color: var(--temp); box-shadow: 0 0 10px var(--temp); }
+        
+        #mic-btn.recording { background: var(--temp) !important; color: white !important; animation: pulse-rec 1s infinite; }
+        @keyframes pulse-rec { 0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6); } 70% { box-shadow: 0 0 0 12px rgba(239, 68, 68, 0); } 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); } }
+
+        .hint-pin { font-size: 8px; color: var(--gold); opacity: 0.6; letter-spacing: 4px; margin-top: 18px; text-transform: uppercase; font-family: 'Cinzel'; text-shadow: 0 0 5px rgba(212, 175, 55, 0.3); }
+    </style>
+</head>
+<body>
+
+    <div id="universe"></div>
+
+    <!-- NOTIFICATION TOAST -->
+    <div id="notif-toast" class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-full bg-gold/10 border border-gold/40 flex items-center justify-center text-gold text-lg" id="notif-icon">✨</div>
+        <div class="flex-1 overflow-hidden">
+            <p id="notif-name" class="text-[9px] font-header text-gold/80 uppercase tracking-widest"></p>
+            <p id="notif-text" class="text-xs text-white/90 truncate font-mystic italic"></p>
+        </div>
+    </div>
+
+    <!-- SAGITTARIUS -->
+    <div id="constellation">
+        <div class="relative w-full h-full flex items-center justify-center">
+            <div class="c-star" style="top: 40%; left: 50%;"></div>
+            <div class="c-star" style="top: 45%; left: 55%;"></div>
+            <div class="c-star" style="top: 55%; left: 52%;"></div>
+            <div class="c-star" style="top: 52%; left: 45%;"></div>
+            <div class="c-star" style="top: 42%; left: 43%;"></div>
+            <div class="c-star" style="top: 35%; left: 48%;"></div>
+            <div class="absolute text-center mt-40">
+                <h1 class="font-header text-gold text-2xl tracking-[15px] mb-2">SAGITTARIUS</h1>
+                <p class="text-[7px] text-gold/30 tracking-[6px] uppercase font-header">Strategic Equilibrium</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- SECURITY LAYER -->
+    <div id="layer-sec" class="layer">
+        <div class="text-center space-y-12 w-full max-w-[280px]">
+            <h1 class="font-header text-2xl tracking-[12px] text-gold">SANCTUM</h1>
+            <div class="relative">
+                <input id="sec-input" type="password" maxlength="6" class="bg-transparent border-b border-gold/60 text-center w-full py-4 outline-none tracking-[20px] text-gold text-2xl" placeholder="••••••" inputmode="numeric">
+                <p class="hint-pin">Astra Inclinant: 01 - 03 - 04</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- IDENTITY LAYER -->
+    <div id="layer-name" class="layer layer-hidden">
+        <div class="w-full max-w-[300px] space-y-10 text-center">
+            <h2 class="font-header text-gold tracking-[4px] text-[10px] uppercase opacity-50">Tuliskan Namamu di Bintang</h2>
+            <input id="name-input" type="text" maxlength="12" class="bg-transparent border-b border-gold/30 text-center w-full py-2 outline-none font-mystic text-3xl text-white" placeholder="Isi namamu...">
+            <button onclick="ascend()" class="w-full border border-gold text-gold py-4 mt-10 font-header text-[9px] tracking-[6px] active:bg-gold/10 transition-all">MANIFESTASI</button>
+        </div>
+    </div>
+
+    <!-- MAIN INTERFACE -->
+    <div id="layer-main" class="layer layer-hidden !p-0 !justify-start !bg-transparent">
+        <div class="w-full p-4 flex justify-between items-center border-b border-white/5 bg-black/95 z-[60]">
+            <div class="font-header text-gold text-[9px] tracking-[5px]">ORACLE v16.9</div>
+            <button onclick="toggleNav(true)" class="text-gold border border-gold/20 px-5 py-2 rounded-full font-header text-[8px] tracking-[2px]">MENU</button>
+        </div>
+
+        <div id="chat-area">
+            <div id="chat-feed" class="flex flex-col gap-4 py-6"></div>
+        </div>
+
+        <div class="control-bar">
+            <div id="status-bar" class="hidden px-4 py-2 bg-white/5 mb-2 border-l-2 border-gold text-[10px]">
+                <div class="flex justify-between text-gold italic">
+                    <span id="status-content">...</span>
+                    <button onclick="clearStatus()">✕</button>
+                </div>
+            </div>
+
+            <div id="img-preview-container" class="mx-auto hidden mb-3 max-w-[150px] border border-gold/50 rounded-lg overflow-hidden">
+                <img id="img-preview-tag" src="" class="w-full h-auto">
+            </div>
+
+            <div class="px-2 mb-4">
+                <button onclick="getFate()" class="w-full border border-gold/40 text-gold/80 p-3 font-header text-[9px] tracking-[3px] bg-gold/5 uppercase active:scale-[0.98]">Bangkitkan Takdir</button>
+            </div>
+
+            <div class="flex gap-3 items-center">
+                <div id="vo-toggle" onclick="toggleVO()" class="vo-indicator">VO</div>
+                
+                <label class="cursor-pointer text-gold/60 p-2">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                    <input type="file" id="img-input" accept="image/*" class="hidden" onchange="previewImg(this)">
+                </label>
+
+                <button id="mic-btn" class="w-[42px] h-[42px] rounded-full border border-zinc-800 flex items-center justify-center text-gold/60">
+                    <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>
+                </button>
+
+                <input id="chat-msg" type="text" placeholder="Gema jiwa..." class="flex-1 bg-transparent border-b border-white/5 text-sm py-2 outline-none text-white focus:border-gold font-mystic">
+                <button onclick="send()" id="send-btn" class="text-gold text-2xl px-2">➤</button>
+            </div>
+            <div id="vn-timer" class="hidden text-center text-[8px] text-red-500 mt-2 font-bold tracking-[3px]">RECORDING...</div>
+        </div>
+    </div>
+
+    <!-- MODALS -->
+    <div id="nav-menu" class="modal-overlay" onclick="toggleNav(false)">
+        <div class="w-full max-w-xs p-6 bg-zinc-950 border border-gold/20 space-y-4 rounded-xl shadow-[0_0_50px_rgba(0,0,0,1)]" onclick="event.stopPropagation()">
+            <h2 class="font-header text-gold text-center text-lg mb-6 tracking-widest">SISTEM</h2>
+            <button onclick="clearHistory()" class="w-full p-4 border border-zinc-900 text-zinc-500 text-[9px] tracking-[3px] font-header hover:text-red-500 active:bg-zinc-900 transition-all">HAPUS RIWAYAT</button>
+            <button onclick="location.reload()" class="w-full p-4 border border-red-900/40 text-red-600 text-[9px] tracking-[3px] font-header active:bg-red-900/10">LOGOUT</button>
+            <button onclick="toggleNav(false)" class="w-full text-center text-zinc-600 text-[8px] font-header pt-4 tracking-[2px]">TUTUP</button>
+        </div>
+    </div>
+
+    <div id="context-menu" class="modal-overlay" onclick="this.classList.remove('modal-active')">
+        <div class="bg-zinc-900 border border-gold/20 w-64 p-2 rounded-lg shadow-2xl" onclick="event.stopPropagation()">
+            <button onclick="handleCopy()" class="w-full text-left p-4 text-white text-sm flex gap-3 hover:bg-white/5 transition-colors">📋 Salin</button>
+            <button id="btn-edit" onclick="handleEdit()" class="hidden w-full text-left p-4 text-blue-400 text-sm flex gap-3 hover:bg-white/5">✏️ Edit</button>
+            <button id="btn-delete" onclick="handleDelete()" class="hidden w-full text-left p-4 text-red-500 text-sm flex gap-3 hover:bg-white/5">🗑️ Hapus</button>
+        </div>
+    </div>
+
+    <div id="vo-viewer" class="modal-overlay">
+        <div class="p-6 border border-gold/30 bg-black/98 rounded-2xl max-w-[90vw] w-full flex flex-col items-center">
+            <div id="vo-content-area" class="w-full text-center"></div>
+            <button onclick="this.parentElement.parentElement.classList.remove('modal-active')" class="mt-10 py-3 px-12 border border-red-500 text-red-500 font-header text-[9px] rounded-full tracking-[4px]">MUSNAHKAN</button>
+        </div>
+    </div>
+
+    <script>
+        const supa = supabase.createClient(
+            'https://rruxlxoeelxjjjmhafkc.supabase.co', 
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJydXhseG9lZWx4ampqbWhhZmtjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk3NDU5OTMsImV4cCI6MjA4NTMyMTk5M30.oR2hl_BDD1P6Dmtos2So-aJ_eoFl1-Kwybt6mQnvq0Q'
+        );
+
+        let myName = localStorage.getItem('oracle_user_v8') || "";
+        let isVO = false, replyTo = null, editId = null, selectedMsg = null, pendingImg = null;
+        let gameHistory = []; 
+
+        if ("Notification" in window) {
+            Notification.requestPermission();
+        }
+
+        // --- VN & IMAGE ---
+        let mediaRecorder, audioChunks = [];
+        function previewImg(input) {
+            if (input.files?.[0]) {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    pendingImg = e.target.result;
+                    document.getElementById('img-preview-tag').src = pendingImg;
+                    document.getElementById('img-preview-container').classList.remove('hidden');
+                };
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+        const micBtn = document.getElementById('mic-btn');
+        async function startRec(e) {
+            e.preventDefault();
+            try {
+                const s = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(s);
+                audioChunks = [];
+                mediaRecorder.ondataavailable = ev => audioChunks.push(ev.data);
+                mediaRecorder.onstop = () => {
+                    const b = new Blob(audioChunks, { type: 'audio/webm' });
+                    const r = new FileReader();
+                    r.readAsDataURL(b);
+                    r.onloadend = async () => await supa.from('Pesan').insert([{ nama: myName, teks: `[VN]${r.result}` }]);
+                    s.getTracks().forEach(t => t.stop());
+                };
+                mediaRecorder.start();
+                micBtn.classList.add('recording');
+                document.getElementById('vn-timer').classList.remove('hidden');
+            } catch(e) {}
+        }
+        function stopRec(e) { e.preventDefault(); if(mediaRecorder?.state === "recording") { mediaRecorder.stop(); micBtn.classList.remove('recording'); document.getElementById('vn-timer').classList.add('hidden'); } }
+        micBtn.addEventListener('touchstart', startRec); micBtn.addEventListener('touchend', stopRec);
+        micBtn.addEventListener('mousedown', startRec); micBtn.addEventListener('mouseup', stopRec);
+
+        // --- AUTH ---
+        if(myName) {
+            document.getElementById('layer-sec').classList.add('layer-hidden');
+            document.getElementById('layer-name').classList.add('layer-hidden');
+            document.getElementById('layer-main').classList.remove('layer-hidden');
+            init();
+        }
+        document.getElementById('sec-input').addEventListener('input', e => {
+            if(e.target.value === '010304') {
+                const sec = document.getElementById('layer-sec');
+                const cons = document.getElementById('constellation');
+                const nameL = document.getElementById('layer-name');
+                sec.style.opacity = '0';
+                setTimeout(() => {
+                    sec.classList.add('layer-hidden');
+                    cons.style.display = 'block';
+                    setTimeout(() => cons.style.opacity = '1', 100);
+                    setTimeout(() => {
+                        cons.style.opacity = '0';
+                        setTimeout(() => { cons.style.display = 'none'; nameL.classList.remove('layer-hidden'); }, 1500);
+                    }, 3500);
+                }, 800);
+            }
+        });
+        function ascend() {
+            const val = document.getElementById('name-input').value.trim();
+            if(!val) return;
+            myName = val; localStorage.setItem('oracle_user_v8', myName);
+            const uv = document.getElementById('universe'); uv.classList.add('warp-active');
+            document.getElementById('layer-name').style.opacity = '0';
+            setTimeout(() => {
+                uv.classList.remove('warp-active');
+                document.getElementById('layer-name').classList.add('layer-hidden');
+                document.getElementById('layer-main').classList.remove('layer-hidden');
+                init();
+            }, 2500);
+        }
+
+        // --- NOTIF ENGINE ---
+        function showNotif(name, text, icon = "✨") {
+            const toast = document.getElementById('notif-toast');
+            document.getElementById('notif-name').innerText = name;
+            document.getElementById('notif-text').innerText = text;
+            document.getElementById('notif-icon').innerText = icon;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3500);
+
+            if ("Notification" in window && Notification.permission === "granted" && document.visibilityState === 'hidden') {
+                new Notification(name, { body: text, icon: 'https://cdn-icons-png.flaticon.com/512/3112/3112946.png' });
+            }
+        }
+
+        // --- CHAT CORE ---
+        async function send() {
+            const inp = document.getElementById('chat-msg');
+            let val = inp.value.trim();
+            if(!val && !pendingImg) return;
+            if(editId) {
+                await supa.from('Pesan').update({ teks: val }).eq('id', editId);
+                clearStatus();
+            } else {
+                let content = val;
+                if(pendingImg) content = `[IMG]${pendingImg}${val ? '|'+val : ''}`;
+                if(replyTo) content = `>>REPLY|${replyTo.sender}|${replyTo.text.substring(0,10)}>>${content}`;
+                if(isVO) content = `[VO]${content}`;
+                await supa.from('Pesan').insert([{ nama: myName, teks: content }]);
+                pendingImg = null; document.getElementById('img-preview-container').classList.add('hidden');
+                document.getElementById('img-input').value = ""; clearStatus();
+            }
+            inp.value = "";
+        }
+
+        function render(msg, isNew = false) {
+            const feed = document.getElementById('chat-feed');
+            let ex = document.getElementById(`m-${msg.id}`);
+            const isMe = msg.nama === myName;
+            let raw = msg.teks, reply = "", body = "";
+
+            if(isNew && !isMe && msg.nama !== "ORACLE") {
+                const isTagged = raw.includes(`@${myName}`);
+                showNotif(msg.nama, isTagged ? "Menandaimu dalam gema..." : (raw.startsWith('[VN]') ? 'Mengirim Voice Note' : (raw.startsWith('[IMG]') ? 'Mengirim Citra' : raw)), isTagged ? "🔔" : "💬");
+            }
+
+            if(raw.startsWith(">>REPLY|")) {
+                const p = raw.split(">>"); const r = p[1].split("|");
+                reply = `<div class="text-[8px] opacity-30 italic border-l border-gold/30 pl-2 mb-1">@${r[1]}: ${r[2]}...</div>`;
+                raw = p.slice(2).join(">>");
+            }
+
+            if(msg.nama === "ORACLE") {
+                try {
+                    const d = JSON.parse(raw);
+                    gameHistory.push(d.type); if(gameHistory.length > 5) gameHistory.shift();
+                    body = `<div class="mx-auto my-2 p-5 bg-zinc-900/40 border border-gold/15 rounded-2xl text-center shadow-lg">
+                        <p class="text-[6px] font-header tracking-[4px] text-gold/60 uppercase mb-2">${d.type}</p>
+                        <p class="text-[8px] text-white/40 mb-3 font-header tracking-wider">Takdir untuk: <span class="text-gold uppercase">${d.player}</span></p>
+                        <p class="font-mystic text-white italic text-lg leading-tight">"${d.content}"</p>
+                    </div>`;
+                } catch(e) { body = raw; }
+            } else if(raw.startsWith("[VO]")) {
+                body = `<div onclick="showSecret('${raw.replace("[VO]","")}')" class="flex items-center gap-3 text-red-600/80 py-2 border border-red-900/15 px-4 rounded-xl active:bg-red-900/5">
+                    <span class="text-lg">🧿</span> <span class="text-[9px] font-header tracking-[4px] uppercase">Gema Tersembunyi</span>
+                </div>`;
+            } else if(raw.startsWith("[IMG]")) {
+                const parts = raw.replace("[IMG]","").split("|");
+                body = `<div><img src="${parts[0]}" class="rounded-lg max-w-full border border-white/10 mb-2">${parts[1] ? `<p class="text-sm opacity-80">${parts[1]}</p>` : ''}</div>`;
+            } else if(raw.startsWith("[VN]")) {
+                body = `<div class="flex items-center gap-2"><div class="w-8 h-8 rounded-full bg-gold/5 flex items-center justify-center text-gold text-xs">▶</div><audio controls src="${raw.replace("[VN]","")}" class="w-40 h-8 opacity-20"></audio></div>`;
+            } else {
+                let cleanText = raw.replace(new RegExp(`@${myName}`, 'g'), `<span class="tag-highlight">@${myName}</span>`);
+                body = `<div class="break-words font-mystic text-lg">${cleanText}</div>`;
+            }
+
+            const html = `<div class="flex flex-col ${isMe ? 'items-end' : 'items-start'}">
+                <span class="text-[7px] font-bold text-zinc-800 uppercase mb-1 ml-1">${msg.nama}</span>
+                <div class="bubble ${isMe ? 'bubble-me' : 'bubble-other'}">
+                    ${reply}${body}
+                </div>
+            </div>`;
+
+            if(ex) ex.innerHTML = html;
+            else {
+                const d = document.createElement('div'); d.id = `m-${msg.id}`; d.className = "chat-item px-4";
+                d.innerHTML = html; feed.appendChild(d); ex = d;
+            }
+            
+            const bub = ex.querySelector('.bubble');
+            bub.onmousedown = () => { bub.style.transform = 'scale(0.98)'; };
+            bub.onmouseup = () => { bub.style.transform = 'scale(1)'; };
+            bub.onclick = (e) => { e.stopPropagation(); showOpts(msg, isMe); };
+            attachSwipe(bub, msg, raw);
+            feed.scrollTop = feed.scrollHeight;
+        }
+
+        // --- GAME THEORY ---
+        async function getFate() {
+            // Updated non-sensual Truths
+            const TRUTHS = [
+                "Siapa orang yang paling ingin kamu hapus dari ingatanmu dan kenapa?",
+                "Pernahkah kamu diam-diam membaca pesan di HP temanmu?",
+                "Apa hal paling kekanak-kanakan yang masih kamu lakukan sampai sekarang?",
+                "Siapa orang di ruangan ini yang menurutmu paling tidak bisa dipercaya?",
+                "Pernahkah kamu berbohong demi mendapatkan perhatian seseorang?",
+                "Apa kesalahan terbesar dalam hidupmu yang belum pernah kamu ceritakan?",
+                "Siapa orang yang paling sering kamu bandingkan dengan dirimu sendiri?",
+                "Pernahkah kamu merasa sangat gagal hanya karena hal sepele?",
+                "Apa prasangka pertamamu saat pertama kali melihat (pilih satu orang di sini)?",
+                "Apa satu rahasia yang kamu simpan hanya karena takut dihakimi orang lain?",
+                "Siapa orang yang paling kamu benci tapi harus tetap kamu temui setiap hari?",
+                "Apa hal paling egois yang pernah kamu lakukan demi kepentinganmu sendiri?",
+                "Pernahkah kamu menangis hanya karena merasa tidak memiliki siapa-siapa?",
+                "Siapa orang yang paling ingin kamu minta maaf tapi kamu terlalu malu?",
+                "Apa ketakutan terbesar yang selalu membuatmu terjaga di malam hari?",
+                "Kapan terakhir kali kamu berpura-pura baik-baik saja padahal sedang hancur?",
+                "Apa satu kebohongan yang masih kamu pertahankan sampai detik ini?",
+                "Siapa orang yang paling ingin kamu lihat gagal dalam hidupnya?",
+                "Pernahkah kamu sengaja menyabotase kebahagiaan orang lain?",
+                "Apa hal yang paling membuatmu merasa sangat tidak percaya diri?",
+                "Siapa sosok yang paling ingin kamu jadikan sebagai panutan hidup?",
+                "Apa penyesalan terbesarmu yang berkaitan dengan persahabatan?",
+                "Pernahkah kamu diam-diam menyimpan dendam pada seseorang di sini?",
+                "Apa hal yang paling tidak kamu sukai dari karakter aslimu sendiri?",
+                "Siapa orang yang paling kamu harapkan untuk tidak pernah bertemu lagi?",
+                "Apa janji paling serius yang pernah kamu langgar dengan sengaja?",
+                "Kapan terakhir kali kamu merasa sangat bangga pada dirimu sendiri?"
+            ];
+            // Updated non-sensual Dares
+            const DARES = [
+                "Tunjukkan riwayat pencarian terakhirmu di media sosial.",
+                "Hubungi orang ke-3 di daftar panggilanmu dan nyanyikan lagu ulang tahun.",
+                "Ganti status WA menjadi 'Lagi butuh pinjaman 10 juta' selama 30 menit.",
+                "Kirim pesan ke teman lama: 'Sebenarnya dulu aku pernah kesel banget sama kamu'.",
+                "Biarkan orang di sebelah kananmu mengirim satu pesan acak dari HP-mu.",
+                "Tunjukkan foto paling memalukan yang ada di galeri fotomu.",
+                "Lakukan live IG/WA selama 1 menit dan katakan hal-hal absurd.",
+                "Kirim VN berisi suara hewan selama 20 detik tanpa berhenti.",
+                "Hubungi salah satu anggota keluargamu dan katakan 'Aku sayang banget'.",
+                "Tunjukkan total saldo di rekening atau dompet digitalmu sekarang.",
+                "Tunjukkan waktu penggunaan layar (screen time) HP-mu hari ini.",
+                "Ganti foto profil dengan foto aib selama 15 menit ke depan.",
+                "Ceritakan satu aib yang paling ingin kamu lupakan seumur hidup.",
+                "Kirim pesan ke gurumu/bosmu: 'Aku butuh motivasi hidup hari ini'.",
+                "Tunjukkan koleksi stiker WA-mu yang paling aneh atau memalukan.",
+                "Lakukan gerakan tari konyol tanpa musik selama 1 menit penuh.",
+                "Kirim VN menyanyikan lagu anak-anak dengan nada yang sangat sedih.",
+                "Sebutkan 3 sifat paling buruk dari teman yang ada di sini.",
+                "Tunjukkan riwayat chat terbawah di aplikasi pesanmu.",
+                "Pesan makanan acak lewat ojek online dan berikan ke orang pertama di jalan.",
+                "Hubungi mantanmu dan tanyakan 'Kabar kamu gimana sekarang?'.",
+                "Gunakan bahasa formal kerajaan saat berbicara selama sisa permainan.",
+                "Kirim pesan ke sahabatmu: 'Jujur, sebenernya aku bukan manusia'.",
+                "Lakukan push-up atau sit-up 20 kali sambil divideokan.",
+                "Tunjukkan berapa banyak jumlah orang yang telah kamu blokir di media sosial.",
+                "Tunjukkan foto pertama yang pernah kamu ambil menggunakan HP ini.",
+                "Sebutkan nominal uang paling kecil yang pernah kamu miliki saat sedang sulit."
+            ];
+
+            const truthC = gameHistory.filter(h => h.includes("TRUTH")).length;
+            const dareC = gameHistory.filter(h => h.includes("DARE")).length;
+            let pW = 0.10, pT = 0.45, pD = 0.45;
+            if (truthC > dareC) { pT -= 0.15; pD += 0.15; } else if (dareC > truthC) { pD -= 0.15; pT += 0.15; }
+            const r = Math.random(); let res = { player: myName };
+            if (r < pW) res = { ...res, type: "THE ORACLE'S GAMBIT 🃏", content: "EQUILIBRIUM BROKEN. Berikan hukuman bebas kepada pemain yang paling diam!" };
+            else if (r < pW + pT) res = { ...res, type: "AXIOM OF TRUTH ⚖️", content: TRUTHS[Math.floor(Math.random() * TRUTHS.length)] };
+            else res = { ...res, type: "PARADOX OF DARE 🔥", content: DARES[Math.floor(Math.random() * DARES.length)] };
+            await supa.from('Pesan').insert([{ nama: "ORACLE", teks: JSON.stringify(res) }]);
+        }
+
+        // --- UTILS ---
+        function showOpts(m, me) {
+            selectedMsg = m; const menu = document.getElementById('context-menu');
+            const eB = document.getElementById('btn-edit'); const dB = document.getElementById('btn-delete');
+            menu.classList.add('modal-active');
+            if(me) { dB.classList.remove('hidden'); if(!m.teks.startsWith("[VN]") && !m.teks.startsWith("[IMG]") && !m.teks.startsWith("[VO]") && m.nama!=="ORACLE") eB.classList.remove('hidden'); else eB.classList.add('hidden'); }
+            else { dB.classList.add('hidden'); eB.classList.add('hidden'); }
+        }
+        function handleEdit() {
+            editId = selectedMsg.id; let t = selectedMsg.teks; if(t.includes(">>REPLY")) t = t.split(">>").pop();
+            document.getElementById('chat-msg').value = t; document.getElementById('status-content').innerText = "MENYUNTING TAKDIR...";
+            document.getElementById('status-bar').classList.remove('hidden'); document.getElementById('send-btn').innerText = "✓";
+            document.getElementById('context-menu').classList.remove('modal-active');
+        }
+        async function handleDelete() { if(confirm("Hapus fragmen ini?")) await supa.from('Pesan').delete().eq('id', selectedMsg.id); document.getElementById('context-menu').classList.remove('modal-active'); }
+        async function clearHistory() { 
+            if(confirm("Hapus seluruh catatan kosmik dari server?")) { 
+                const { error } = await supa.from('Pesan').delete().neq('nama', 'ORACLE_SYSTEM_CORE'); 
+                if(!error) {
+                    document.getElementById('chat-feed').innerHTML = "";
+                    toggleNav(false); 
+                }
+            } 
+        }
+        function handleCopy() { let t = selectedMsg.teks; if(t.includes(">>REPLY")) t = t.split(">>").pop(); navigator.clipboard.writeText(t); document.getElementById('context-menu').classList.remove('modal-active'); }
+        
+        function showSecret(t) {
+            const area = document.getElementById('vo-content-area');
+            if(t.startsWith("[IMG]")) {
+                const parts = t.replace("[IMG]","").split("|");
+                area.innerHTML = `<img src="${parts[0]}" class="rounded-xl w-full mb-4 shadow-2xl border border-gold/10"> ${parts[1]?`<p class="text-gold font-mystic italic text-xl">"${parts[1]}"</p>`:''}`;
+            } else { area.innerHTML = `<p class="text-gold font-mystic text-3xl italic">"${t}"</p>`; }
+            document.getElementById('vo-viewer').classList.add('modal-active');
+        }
+
+        function toggleVO() { isVO = !isVO; document.getElementById('vo-toggle').classList.toggle('active', isVO); }
+        function toggleNav(s) { document.getElementById('nav-menu').classList.toggle('modal-active', s); }
+        function clearStatus() { editId = null; replyTo = null; document.getElementById('status-bar').classList.add('hidden'); document.getElementById('send-btn').innerText = "➤"; }
+        function attachSwipe(el, m, t) {
+            let sX = 0, cX = 0; el.ontouchstart = e => sX = e.touches[0].clientX;
+            el.ontouchmove = e => { cX = e.touches[0].clientX - sX; if(cX > 0 && cX < 60) el.style.transform = `translateX(${cX}px)`; };
+            el.ontouchend = () => { el.style.transition = 'transform 0.3s'; if(cX > 50) { replyTo={sender:m.nama, text:t}; document.getElementById('status-content').innerText=`Menjawab @${m.nama}`; document.getElementById('status-bar').classList.remove('hidden'); } el.style.transform = 'translateX(0)'; cX = 0; };
+        }
+        function init() {
+            supa.from('Pesan').select('*').order('id', { ascending: true }).limit(60).then(({ data }) => data?.forEach(m => render(m, false)));
+            supa.channel('oracle_v16_9').on('postgres_changes', { event: '*', schema: 'public', table: 'Pesan' }, p => {
+                if(p.eventType === 'INSERT') render(p.new, true);
+                if(p.eventType === 'UPDATE') render(p.new);
+                if(p.eventType === 'DELETE') document.getElementById(`m-${p.old.id}`)?.remove();
+            }).subscribe();
+        }
+        const uv = document.getElementById('universe');
+        for(let i=0; i<100; i++) {
+            const s = document.createElement('div'); s.className = 'star';
+            const sz = Math.random()*1.8; s.style.width = sz+'px'; s.style.height = sz+'px';
+            s.style.top = Math.random()*100+'%'; s.style.left = Math.random()*100+'%';
+            uv.appendChild(s);
+        }
+    </script>
+</body>
+</html>
+
