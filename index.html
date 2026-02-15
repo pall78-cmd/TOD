@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Oracle v16.9 - Restoration & Audio Fix</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=Cormorant+Garamond:ital,wght@0,500;1,500&family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
+    
+    <style>
+        /* CSS Root & Variables */
+        :root { 
+            --gold: #D4AF37; 
+            --void: #020205; 
+            --wild: #a855f7; 
+            --temp: #ef4444; 
+            --arcana: #0ea5e9; 
+            --glass: rgba(255, 255, 255, 0.03);
+            --border: rgba(212, 175, 55, 0.2);
+        }
+
+        /* Base Reset */
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { 
+            background-color: var(--void); 
+            color: #f0f0f0; 
+            font-family: 'Montserrat', sans-serif; 
+            height: 100dvh; 
+            width: 100vw; 
+            overflow: hidden; 
+            margin: 0; 
+            position: fixed; 
+            user-select: none; 
+            -webkit-user-select: none; 
+        }
+
+        /* Typography */
+        .font-header { font-family: 'Cinzel', serif; }
+        .font-mystic { font-family: 'Cormorant Garamond', serif; }
+
+        /* Background Universe */
+        #universe { 
+            position: fixed; 
+            inset: 0; 
+            z-index: 1; 
+            background: radial-gradient(circle at center, #1a0b2e 0%, #000 100%); 
+            pointer-events: none; 
+        }
+
+        /* Chat Layout */
+        #chat-area { 
+            position: relative; 
+            flex: 1; 
+            width: 100%; 
+            overflow-y: auto; 
+            padding: 15px; 
+            z-index: 10; 
+            scroll-behavior: smooth; 
+            -webkit-overflow-scrolling: touch; 
+        }
+
+        /* Message Bubbles */
+        .bubble { 
+            padding: 12px 16px; 
+            border-radius: 18px; 
+            font-size: 14px; 
+            position: relative; 
+            max-width: 85%; 
+            z-index: 20; 
+            transition: transform 0.3s ease; 
+            touch-action: pan-x; 
+        }
+        .bubble-me { 
+            background: rgba(212, 175, 55, 0.08); 
+            border: 1px solid rgba(212, 175, 55, 0.25); 
+            border-bottom-right-radius: 2px; 
+        }
+        .bubble-other { 
+            background: var(--glass); 
+            border: 1px solid rgba(255, 255, 255, 0.08); 
+            border-bottom-left-radius: 2px; 
+        }
+        .tag-highlight { 
+            color: var(--gold); 
+            font-weight: bold; 
+            text-shadow: 0 0 5px rgba(212,175,55,0.3); 
+        }
+
+        /* Notifications */
+        #notif-toast { 
+            position: fixed; 
+            top: 20px; 
+            left: 50%; 
+            transform: translateX(-50%) translateY(-150px); 
+            width: 92%; 
+            max-width: 400px; 
+            background: rgba(10, 10, 15, 0.95); 
+            border: 1px solid var(--gold); 
+            padding: 14px; 
+            border-radius: 16px; 
+            z-index: 10000; 
+            transition: transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1.1); 
+            backdrop-filter: blur(20px); 
+            pointer-events: none; 
+        }
+        #notif-toast.show { transform: translateX(-50%) translateY(0); }
+
+        /* Controls */
+        .control-bar { 
+            width: 100%; 
+            background: #000; 
+            border-top: 1px solid rgba(255,255,255,0.1); 
+            z-index: 500; 
+            padding: 1rem; 
+            padding-bottom: calc(1rem + env(safe-area-inset-bottom)); 
+        }
+        
+        /* Modals & Overlays */
+        .modal-overlay { 
+            position: fixed; 
+            inset: 0; 
+            background: rgba(0,0,0,0.92); 
+            z-index: 8000; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            opacity: 0; 
+            pointer-events: none; 
+            transition: 0.3s; 
+            backdrop-filter: blur(15px); 
+        }
+        .modal-active { opacity: 1; pointer-events: auto; }
+
+        /* System Layers */
+        .layer { 
+            position: absolute; 
+            inset: 0; 
+            z-index: 1000; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+            padding: 20px; 
+            transition: all 1s ease; 
+            background: var(--void); 
+        }
+        .layer-hidden { opacity: 0 !important; pointer-events: none !important; visibility: hidden !important; z-index: -1; }
+        
+        #conn-status { 
+            position: fixed; 
+            top: 70px; 
+            left: 50%; 
+            transform: translateX(-50%); 
+            font-size: 7px; 
+            color: var(--gold); 
+            letter-spacing: 2px; 
+            text-transform: uppercase; 
+            z-index: 2000; 
+            opacity: 0; 
+            transition: 0.5s; 
+            background: rgba(0,0,0,0.8); 
+            border: 1px solid rgba(212,175,55,0.2); 
+            padding: 4px 12px; 
+            border-radius: 20px; 
+            pointer-events: none; 
+        }
+        #conn-status.active { opacity: 1; }
+
+        /* Audio Player Styling */
+        audio { 
+            height: 35px; 
+            filter: invert(100%) hue-rotate(180deg) brightness(1.5); 
+            max-width: 100%; 
+            border-radius: 50px;
+        }
+
+        /* Buttons & Interactions */
+        .btn-danger-mystic { 
+            transition: all 0.3s ease; 
+            cursor: pointer !important; 
+            position: relative; 
+            z-index: 8001; 
+        }
+        .btn-danger-mystic:active { 
+            background: rgba(239, 68, 68, 0.3) !important; 
+            border-color: #ef4444 !important; 
+            color: #ef4444 !important; 
+            transform: scale(0.96); 
+        }
+
+        .fate-card {
+            animation: fateGlow 3s infinite alternate;
+        }
+        @keyframes fateGlow {
+            from { box-shadow: 0 0 5px rgba(212,175,55,0.1); }
+            to { box-shadow: 0 0 20px rgba(212,175,55,0.3); }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="universe"></div>
+    <div id="conn-status">Sinkronisasi Kosmis...</div>
+
+    <!-- Notification Engine -->
+    <div id="notif-toast" class="flex items-center gap-4">
+        <div id="notif-icon-box" class="w-12 h-12 rounded-full bg-gold/5 border border-gold/30 flex items-center justify-center text-xl shadow-[0_0_15px_rgba(212,175,55,0.2)]">✨</div>
+        <div class="flex-1 min-w-0">
+            <div class="flex justify-between items-center mb-0.5">
+                <p id="notif-name" class="text-[10px] font-header text-gold uppercase tracking-[2px] truncate"></p>
+                <span id="notif-tag" class="hidden bg-gold text-black text-[7px] px-1.5 py-0.5 rounded font-bold ml-2">MENTION</span>
+            </div>
+            <p id="notif-text" class="text-[12px] text-white/80 truncate font-mystic italic leading-tight"></p>
+        </div>
+    </div>
+
+    <!-- Security Gateway -->
+    <div id="layer-sec" class="layer">
+        <div class="text-center space-y-12 w-full max-w-[280px]">
+            <h1 class="font-header text-2xl tracking-[12px] text-gold">SANCTUM</h1>
+            <input id="sec-input" type="password" maxlength="6" class="bg-transparent border-b border-gold/60 text-center w-full py-4 outline-none tracking-[20px] text-gold text-2xl" placeholder="••••••" inputmode="numeric">
+        </div>
+    </div>
+
+    <!-- Naming Gateway -->
+    <div id="layer-name" class="layer layer-hidden">
+        <div class="w-full max-w-[300px] space-y-10 text-center">
+            <h2 class="font-header text-gold tracking-[4px] text-[10px] uppercase opacity-50">Tulis namamu di bintang</h2>
+            <input id="name-input" type="text" maxlength="12" class="bg-transparent border-b border-gold/30 text-center w-full py-2 outline-none font-mystic text-3xl text-white" placeholder="...">
+            <button onclick="ascend()" class="w-full border border-gold text-gold py-4 mt-10 font-header text-[9px] tracking-[6px] hover:bg-gold/10 transition-all">MANIFESTASI</button>
+        </div>
+    </div>
+
+    <!-- Main Realm -->
+    <div id="layer-main" class="layer layer-hidden !p-0 !justify-start !bg-transparent !z-10">
+        <div class="w-full p-4 flex justify-between items-center border-b border-white/5 bg-black/95 z-[600]">
+            <div class="font-header text-gold text-[9px] tracking-[5px]">ORACLE v16.9</div>
+            <button onclick="toggleNav(true)" class="text-gold border border-gold/20 px-5 py-2 rounded-full font-header text-[8px] tracking-[2px] active:bg-gold/10">MENU</button>
+        </div>
+
+        <div id="chat-area">
+            <div id="chat-feed" class="flex flex-col gap-4 py-6"></div>
+        </div>
+
+        <!-- System Controls -->
+        <div class="control-bar">
+            <!-- Context Indicator -->
+            <div id="status-bar" class="hidden px-4 py-2 bg-white/5 mb-2 border-l-2 border-gold text-[10px] flex justify-between items-center">
+                <span id="status-content" class="text-gold italic"></span>
+                <button onclick="clearStatus()" class="text-white/40 p-1">✕</button>
+            </div>
+
+            <!-- Image Stage -->
+            <div id="img-preview-container" class="mx-auto hidden mb-3 max-w-[150px] border border-gold/50 rounded-lg overflow-hidden shadow-lg">
+                <img id="img-preview-tag" src="" class="w-full h-auto">
+            </div>
+
+            <!-- Fate Button -->
+            <div class="px-2 mb-4">
+                <button id="fate-btn" onclick="getFate()" class="w-full border border-gold/40 text-gold/80 p-3 font-header text-[9px] tracking-[3px] bg-gold/5 uppercase active:scale-[0.98] transition-all">Bangkitkan Takdir</button>
+            </div>
+
+            <!-- Input Engine -->
+            <div class="flex gap-3 items-center">
+                <div id="vo-toggle" onclick="toggleVO()" class="vo-indicator w-[40px] h-[40px] border border-zinc-800 rounded-full flex items-center justify-center text-[10px] text-zinc-600 font-header cursor-pointer z-[601] transition-all">VO</div>
+                
+                <label class="cursor-pointer text-gold/60 p-2 z-[601] active:scale-110 transition-transform">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                    <input type="file" id="img-input" accept="image/*" class="hidden" onchange="previewImg(this)">
+                </label>
+
+                <button id="mic-btn" onclick="startVoiceRecording()" class="w-[42px] h-[42px] rounded-full border border-zinc-800 flex items-center justify-center text-gold/60 z-[601] active:scale-110 active:bg-gold/10 transition-all">
+                    <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>
+                </button>
+
+                <input id="chat-msg" type="text" placeholder="Gema jiwa..." class="flex-1 bg-transparent border-b border-white/5 text-sm py-2 outline-none text-white focus:border-gold font-mystic transition-all" autocomplete="off">
+                
+                <button onclick="send()" id="send-btn" class="text-gold text-2xl px-2 z-[601] active:scale-90 transition-transform">➤</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navigation Portal -->
+    <div id="nav-menu" class="modal-overlay" onclick="toggleNav(false)">
+        <div class="w-full max-w-xs p-6 bg-zinc-950 border border-gold/20 space-y-4 rounded-xl shadow-2xl" onclick="event.stopPropagation()">
+            <h2 class="font-header text-gold text-center text-lg mb-6 tracking-widest">SISTEM PUSAT</h2>
+            <button id="btn-clear-history" onclick="clearHistory()" class="btn-danger-mystic w-full p-4 border border-zinc-900 text-zinc-500 text-[9px] tracking-[3px] font-header uppercase hover:text-red-500 transition-colors">HAPUS RIWAYAT</button>
+            <button onclick="location.reload()" class="w-full p-4 border border-red-900/40 text-red-600 text-[9px] tracking-[3px] font-header uppercase">LOGOUT</button>
+        </div>
+    </div>
+
+    <!-- Context Portal -->
+    <div id="context-menu" class="modal-overlay" onclick="this.classList.remove('modal-active')">
+        <div class="bg-zinc-900 border border-gold/20 w-64 p-2 rounded-lg shadow-2xl" onclick="event.stopPropagation()">
+            <button onclick="handleCopy()" class="w-full text-left p-4 text-white text-sm hover:bg-white/5 transition-colors">📋 Salin Gema</button>
+            <button id="btn-edit" onclick="handleEdit(event)" class="hidden w-full text-left p-4 text-blue-400 text-sm hover:bg-white/5 border-t border-white/5 transition-colors">✏️ Ubah Takdir</button>
+            <button id="btn-delete" onclick="handleDelete()" class="hidden w-full text-left p-4 text-red-500 text-sm hover:bg-white/5 border-t border-white/5 transition-colors">🗑️ Musnahkan</button>
+        </div>
+    </div>
+
+    <script>
+        /* Database & Config */
+        const supa = supabase.createClient(
+            'https://rruxlxoeelxjjjmhafkc.supabase.co', 
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJydXhseG9lZWx4ampqbWhhZmtjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk3NDU5OTMsImV4cCI6MjA4NTMyMTk5M30.oR2hl_BDD1P6Dmtos2So-aJ_eoFl1-Kwybt6mQnvq0Q'
+        );
+
+        let myName = localStorage.getItem('oracle_user_v8') || "";
+        let isVO = false, replyTo = null, editId = null, selectedMsg = null, pendingImg = null;
+        let currentChannel = null, isConnecting = false, mediaRecorder = null, audioChunks = [];
+
+        /* Game Theory Data */
+        const fatePool = {
+            truth: ["Apa rahasia terdalammu?", "Siapa yang kamu kagumi di sini?", "Hal memalukan yang pernah terjadi?", "Siapa orang yang paling tidak kamu suka di sini?"],
+            dare: ["Kirim Voice Note menyanyi lagu galau!", "Jangan bicara selama 15 menit ke depan.", "Kirim screenshot chat terakhirmu!", "Lakukan voice note suara bayi!"],
+            wildcard: ["Tukar nama profilmu selama 1 jam!", "Jadi pengamat (hanya baca) selama 30 menit.", "Panggil semua orang di sini dan katakan sayang!", "Tulis pesan cinta untuk Oracle."]
+        };
+
+        /* Transmission Core */
+        async function send(customContent = null) {
+            const inp = document.getElementById('chat-msg');
+            let val = customContent || inp.value.trim();
+            if(!val && !pendingImg) return;
+
+            try {
+                if(editId) {
+                    const { error } = await supa.from('Pesan').update({ teks: val }).eq('id', editId);
+                    if(!error) clearStatus();
+                } else {
+                    let content = val;
+                    if(pendingImg) content = `[IMG]${pendingImg}${val ? '|'+val : ''}`;
+                    if(replyTo) content = `>>REPLY|${replyTo.sender}|${replyTo.text}>>${content}`;
+                    if(isVO && !content.startsWith("[VN]")) content = `[VO]${content}`;
+                    
+                    await supa.from('Pesan').insert([{ nama: myName, teks: content }]);
+                    pendingImg = null; 
+                    document.getElementById('img-preview-container').classList.add('hidden');
+                    clearStatus();
+                }
+                inp.value = "";
+            } catch (err) { console.error("Send Error:", err); }
+        }
+
+        /* Rendering Engine */
+        function render(msg, isNew = false) {
+            const feed = document.getElementById('chat-feed');
+            let existing = document.getElementById(`m-${msg.id}`);
+            const isMe = msg.nama === myName;
+            let raw = msg.teks, reply = "", body = "";
+
+            /* Reply Detection */
+            if(raw.startsWith(">>REPLY|")) {
+                const parts = raw.split(">>");
+                const replyMeta = parts[1].split("|");
+                reply = `<div class="text-[8px] opacity-40 italic border-l border-gold/30 pl-2 mb-2">Membalas @${replyMeta[1]}: ${replyMeta[2]}...</div>`;
+                raw = parts.slice(2).join(">>");
+            }
+
+            /* Content Branching (FIXED AUDIO RENDER) */
+            if(raw.includes("[VN]")) {
+                const audioUrl = raw.split("[VN]")[1];
+                body = `<div class="flex flex-col gap-1">
+                            <audio controls preload="metadata" src="${audioUrl}"></audio>
+                            <span class="text-[7px] opacity-40 font-header tracking-widest mt-1">VOICE NOTE • ${msg.nama}</span>
+                        </div>`;
+            } else if(msg.nama === "ORACLE") {
+                try {
+                    const d = JSON.parse(raw);
+                    body = `<div class="mx-auto my-2 p-4 bg-zinc-900/60 border border-gold/20 rounded-xl text-center fate-card">
+                        <p class="text-[6px] font-header text-gold/60 uppercase mb-1 tracking-widest">${d.type}</p>
+                        <p class="text-[8px] text-zinc-500 italic mb-2">Dipanggil oleh ${d.invoker}</p>
+                        <p class="font-mystic text-white italic text-lg">"${d.content}"</p>
+                    </div>`;
+                } catch(e) { body = raw; }
+            } else if(raw.startsWith("[VO]")) {
+                body = `<div class="text-red-600/80 py-2 px-4 rounded-xl border border-red-900/20 text-[9px] font-header tracking-widest uppercase text-center bg-red-950/10">👁️ Gema Tersembunyi (View Once)</div>`;
+            } else if(raw.startsWith("[IMG]")) {
+                const parts = raw.replace("[IMG]","").split("|");
+                body = `<img src="${parts[0]}" class="rounded-lg w-full mb-1 border border-white/5 shadow-md">${parts[1]||''}`;
+            } else {
+                let clean = raw.replace(new RegExp(`@${myName}`, 'g'), `<span class="tag-highlight">@${myName}</span>`);
+                body = `<div class="break-words font-mystic text-lg leading-relaxed">${clean}</div>`;
+            }
+
+            const html = `<span class="text-[7px] font-bold text-zinc-700 uppercase mb-1 ml-1 tracking-wider">${msg.nama}</span><div class="bubble ${isMe ? 'bubble-me' : 'bubble-other'}">${reply}${body}</div>`;
+            
+            if(existing) { 
+                existing.innerHTML = html; 
+            } else {
+                const d = document.createElement('div'); d.id = `m-${msg.id}`; 
+                d.className = `px-4 flex flex-col ${isMe ? 'items-end' : 'items-start'} transition-all`;
+                d.innerHTML = html;
+                setupSwipe(d, msg);
+                feed.appendChild(d); existing = d;
+            }
+            
+            const bub = existing.querySelector('.bubble');
+            bub.onclick = (e) => { e.stopPropagation(); showOpts(msg, isMe); };
+            if(isNew) feed.scrollTop = feed.scrollHeight;
+        }
+
+        /* Voice Engine (1 MINUTE LIMIT) */
+        async function startVoiceRecording() {
+            const btn = document.getElementById('mic-btn');
+            if (mediaRecorder && mediaRecorder.state === "recording") {
+                mediaRecorder.stop();
+                btn.classList.remove('text-red-500', 'border-red-500');
+                return;
+            }
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+                
+                mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+                mediaRecorder.onstop = async () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    const reader = new FileReader();
+                    reader.onloadend = () => send(`[VN]${reader.result}`);
+                    reader.readAsDataURL(audioBlob);
+                    stream.getTracks().forEach(track => track.stop());
+                };
+
+                mediaRecorder.start();
+                btn.classList.add('text-red-500', 'border-red-500');
+
+                // Auto Stop at 60s
+                setTimeout(() => {
+                    if (mediaRecorder.state === "recording") {
+                        mediaRecorder.stop();
+                        btn.classList.remove('text-red-500', 'border-red-500');
+                    }
+                }, 60000);
+
+            } catch (err) { console.error("Mic Access Denied", err); }
+        }
+
+        /* System Logic */
+        async function clearHistory() {
+            const btn = document.getElementById('btn-clear-history');
+            if(!confirm("Musnahkan seluruh memori kosmik ini?")) return;
+            
+            btn.innerText = "MEMUSNAHKAN...";
+            btn.style.color = "#ef4444";
+            btn.style.borderColor = "#ef4444";
+            
+            try {
+                const { error } = await supa.from('Pesan').delete().neq('id', 0);
+                if(!error) {
+                    document.getElementById('chat-feed').innerHTML = "";
+                    toggleNav(false);
+                }
+            } catch (e) { console.error(e); }
+            finally {
+                setTimeout(() => {
+                    btn.innerText = "HAPUS RIWAYAT";
+                    btn.style.color = "";
+                    btn.style.borderColor = "";
+                }, 1000);
+            }
+        }
+
+        async function getFate() {
+            const keys = Object.keys(fatePool);
+            const type = keys[Math.floor(Math.random() * keys.length)];
+            const content = fatePool[type][Math.floor(Math.random() * fatePool[type].length)];
+            await supa.from('Pesan').insert([{ nama: "ORACLE", teks: JSON.stringify({ type: type.toUpperCase(), content, invoker: myName }) }]);
+        }
+
+        /* Navigation & Interaction */
+        function setupSwipe(el, msg) {
+            let startX = 0;
+            const bub = el.querySelector('.bubble');
+            el.addEventListener('touchstart', e => { startX = e.touches[0].clientX; }, {passive: true});
+            el.addEventListener('touchmove', e => {
+                let diff = e.touches[0].clientX - startX;
+                if(diff > 0 && diff < 80) bub.style.transform = `translateX(${diff}px)`;
+            }, {passive: true});
+            el.addEventListener('touchend', e => {
+                let diff = e.changedTouches[0].clientX - startX;
+                bub.style.transform = '';
+                if(diff > 50) {
+                    replyTo = { sender: msg.nama, text: msg.teks.substring(0, 20) };
+                    document.getElementById('status-content').innerText = `MEMBALAS @${msg.nama}...`;
+                    document.getElementById('status-bar').classList.remove('hidden');
+                    document.getElementById('chat-msg').focus();
+                }
+            });
+        }
+
+        async function initSession() {
+            if (isConnecting) return;
+            isConnecting = true;
+            showConnStatus("Membangun Gema...", 0);
+
+            const { data } = await supa.from('Pesan').select('*').order('id', { ascending: false }).limit(60);
+            if(data) {
+                document.getElementById('chat-feed').innerHTML = "";
+                data.reverse().forEach(m => render(m, false));
+                document.getElementById('chat-area').scrollTop = 99999;
+            }
+
+            if (currentChannel) supa.removeChannel(currentChannel);
+            currentChannel = supa.channel('oracle_room')
+                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'Pesan' }, p => {
+                    render(p.new, true);
+                    if(p.new.nama !== myName) triggerHybridNotif(p.new);
+                })
+                .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'Pesan' }, p => render(p.new))
+                .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'Pesan' }, p => document.getElementById(`m-${p.old.id}`)?.remove())
+                .subscribe(status => {
+                    isConnecting = false;
+                    if(status === 'SUBSCRIBED') showConnStatus("Terkoneksi", 2000);
+                });
+        }
+
+        function triggerHybridNotif(msg) {
+            const toast = document.getElementById('notif-toast');
+            document.getElementById('notif-name').innerText = msg.nama;
+            document.getElementById('notif-text').innerText = msg.teks.includes("[VN]") ? "Gema Suara Baru" : msg.teks.substring(0, 40);
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+        /* Utilities */
+        function showOpts(m, me) {
+            selectedMsg = m;
+            document.getElementById('context-menu').classList.add('modal-active');
+            document.getElementById('btn-delete').classList.toggle('hidden', !me);
+            document.getElementById('btn-edit').classList.toggle('hidden', !(me && !m.teks.includes("[")));
+        }
+
+        function handleEdit(e) {
+            editId = selectedMsg.id;
+            document.getElementById('chat-msg').value = selectedMsg.teks;
+            document.getElementById('status-content').innerText = "MENGUBAH TAKDIR...";
+            document.getElementById('status-bar').classList.remove('hidden');
+            document.getElementById('context-menu').classList.remove('modal-active');
+        }
+
+        async function handleDelete() {
+            if(confirm("Musnahkan pesan?")) {
+                await supa.from('Pesan').delete().eq('id', selectedMsg.id);
+                document.getElementById('context-menu').classList.remove('modal-active');
+            }
+        }
+
+        function toggleNav(s) { document.getElementById('nav-menu').classList.toggle('modal-active', s); }
+        function showConnStatus(t, d) { const el = document.getElementById('conn-status'); el.innerText = t; el.classList.add('active'); if(d > 0) setTimeout(() => el.classList.remove('active'), d); }
+        function clearStatus() { editId = null; replyTo = null; document.getElementById('status-bar').classList.add('hidden'); }
+        function toggleVO() { isVO = !isVO; document.getElementById('vo-toggle').classList.toggle('text-red-500', isVO); document.getElementById('vo-toggle').classList.toggle('border-red-500', isVO); }
+        function previewImg(i) { if(i.files?.[0]) { const r = new FileReader(); r.onload = e => { pendingImg = e.target.result; document.getElementById('img-preview-container').classList.remove('hidden'); document.getElementById('img-preview-tag').src = pendingImg; }; r.readAsDataURL(i.files[0]); } }
+        async function handleCopy() { navigator.clipboard.writeText(selectedMsg.teks); document.getElementById('context-menu').classList.remove('modal-active'); }
+
+        async function ascend() {
+            const val = document.getElementById('name-input').value.trim();
+            if(!val) return;
+            myName = val; localStorage.setItem('oracle_user_v8', myName);
+            document.getElementById('layer-name').classList.add('layer-hidden');
+            document.getElementById('layer-main').classList.remove('layer-hidden');
+            initSession();
+        }
+
+        /* Entry Listeners */
+        document.getElementById('sec-input').addEventListener('input', e => { if(e.target.value === '010304') { document.getElementById('layer-sec').classList.add('layer-hidden'); document.getElementById('layer-name').classList.remove('layer-hidden'); } });
+        document.getElementById('chat-msg').addEventListener('keypress', e => { if(e.key === 'Enter') send(); });
+
+        /* Persistence Check */
+        if(myName) {
+            document.getElementById('layer-sec').classList.add('layer-hidden');
+            document.getElementById('layer-main').classList.remove('layer-hidden');
+            initSession();
+        }
+    </script>
+</body>
+</html>
+
