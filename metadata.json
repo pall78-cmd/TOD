@@ -1,7 +1,0 @@
-{
-  "name": "Oracle v17.9 Harmony Enhanced",
-  "description": "A mystic chat application with Fate Cards, Voice Notes, and View Once messages.",
-  "requestFramePermissions": [
-    "microphone"
-  ]
-}
